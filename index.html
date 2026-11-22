@@ -292,7 +292,7 @@ body:not(.rd) #dbar{opacity:0;pointer-events:none}
 #hints .hl.shown{animation:hfade .5s ease .5s forwards}
 #hints .hnote{animation:hfade .5s ease .1s forwards}
 #hints .hl.bye{opacity:0!important}
-#hints .hnote{background:rgba(12,12,12,.9);padding:16px 22px 12px;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.6);color:#f3ead2!important;font-size:24px!important;max-width:min(296px,90vw);animation-delay:.1s;font-size:21px!important}
+#hints .hnote{background:rgba(12,12,12,.9);padding:16px 22px 12px;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.6);color:#f3ead2!important;font-size:24px!important;max-width:min(520px,90vw);animation-delay:.1s}
 #hints .hok,#hints .hno{pointer-events:auto;border:0;border-radius:999px;background:var(--btn);color:#efe6cf;font:500 14px var(--ui);padding:7px 18px;margin-top:8px;box-shadow:0 2px 8px rgba(0,0,0,.5);text-shadow:none}
 #hints .hok:hover,#hints .hno:hover{background:var(--btnh)}
 #hints .hno{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom));margin:0}
@@ -479,7 +479,7 @@ var Y0=Object.keys(RAW).sort(),CURY=String(new Date().getFullYear());
 if(!RAW[CURY])RAW[CURY]=[];   // папка текущего года есть всегда: в неё пишутся новые дни
 var YEARS=Object.keys(RAW).sort();
 var $=function(id){return document.getElementById(id)};
-var BUILD="22.11.2026 03:48";
+var BUILD="22.11.2026 04:06";
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е")}
 function safeLS(f){try{return f()}catch(e){return null}}
@@ -2268,7 +2268,7 @@ function showHints(){
     ov.appendChild(box);it.w=box.offsetWidth;it.hh=box.offsetHeight;box.style.width=it.w+"px";box.style.maxWidth="none";   // ширина фиксируется, чтобы подпись не перестраивалась у края экрана
     return it;
   }).filter(Boolean);
-  var bottom={l:W/2-Math.min(280,W*.46),r:W/2+Math.min(280,W*.46),t:H-70,b:H};
+  var bottom={l:W/2-Math.min(280,W*.46),r:W/2+Math.min(280,W*.46),t:H-76,b:H};
   var noteBox=document.createElement("div");noteBox.className="hl hnote";noteBox.style.color="#f3ead2";noteBox.style.visibility="hidden";noteBox.style.animation="none";noteBox.style.transform="none";noteBox.style.left="0px";noteBox.style.top="0px";
   var noteT=document.createElement("div");noteT.className="ht";
   noteT.textContent=window.__SHELL?"Добавь эту страницу на экран «Домой»: нажми «Поделиться», потом «На экран Домой». Тогда дневник откроется как приложение и сохранится на телефоне.":"Положи папку «Дневники» в надёжное место, например в «Документы», не на рабочий стол и не в «Загрузки». Если её удалить, пропадут и дневник, и фотографии.";
@@ -2326,7 +2326,6 @@ function showHints(){
     for(var i=0;i<cand.length;i++){
       var c=cand[i],rp=rP({l:c.cx-nW/2,t:c.cy-nH/2,r:c.cx+nW/2,b:c.cy+nH/2},PAD),ok=true;
       if(rI(rp,bottom))continue;
-      if(stackR&&rI(rp,stackR))continue;
       for(var q=0;q<targets.length&&ok;q++)if(rI(rp,targets[q]))ok=false;
       bestL.placed.forEach(function(pl){if(rI(rp,pl.rp)||pR(pl.pts,rp))ok=false});
       if(ok){bestN=c;break}
