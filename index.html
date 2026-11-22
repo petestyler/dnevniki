@@ -479,7 +479,7 @@ var Y0=Object.keys(RAW).sort(),CURY=String(new Date().getFullYear());
 if(!RAW[CURY])RAW[CURY]=[];   // папка текущего года есть всегда: в неё пишутся новые дни
 var YEARS=Object.keys(RAW).sort();
 var $=function(id){return document.getElementById(id)};
-var BUILD="22.11.2026 04:06";
+var BUILD="22.11.2026 04:12";
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е")}
 function safeLS(f){try{return f()}catch(e){return null}}
@@ -947,6 +947,7 @@ function dropBook(){
   restoreFold();document.body.classList.remove("rd");if(G.W)placeFolds();
 }
 function setDay(d,words){
+  if(!curDay||curDay.d!==d.d)COPIED=null;
   S.y=d.y;S.m=d.m;S.d=d.dd;S.cy=d.y;S.cm=d.m;S.edit=false;S.mode="day";
   curDay=d;fromResults=!!words;if(words)S.words=words;
   if(typeof W!=="undefined"&&W.open)leaveWrite();
@@ -982,6 +983,7 @@ function actsHtml(){
 function renderBar(){
   var host=G.mob?$("actw"):placeBar();if(!host)return;
   host.innerHTML=actsHtml();
+  if(COPIED&&curDay&&COPIED===curDay.d&&$("cp"))$("cp").textContent="Скопировано";
   var go=function(id,f){var e=$(id);if(e)e.onclick=f};
   if(!S.edit&&curDay){if(!adj(curDay,-1))$("tl").disabled=true;if(!adj(curDay,1))$("tr").disabled=true}
   if(!curDay){["tl","tr","cp","addph","ee"].forEach(function(id){var e=$(id);if(e)e.disabled=true});
@@ -1340,9 +1342,10 @@ function doCopyText(text){
   var ok=function(){toast("Код скопирован: перешли его вместе со ссылкой",5000)};
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(ok,function(){window.prompt("Скопируй код:",text)});else window.prompt("Скопируй код:",text);
 }
+var COPIED=null;
 function doCopy(){
   var text=curDay.dd+" "+MONTHS[curDay.m-1]+" "+curDay.y+", "+curDay.w+"\n"+curDay.t;
-  var ok=function(){toast("Скопировано")};
+  var ok=function(){var b=$("cp");if(b){COPIED=curDay.d;b.textContent="Скопировано"}else toast("Скопировано")};   // подпись меняется на самой кнопке и держится, пока не уйти с этой страницы
   function fb(){var a=document.createElement("textarea");a.value=text;a.style.position="fixed";a.style.opacity="0";document.body.appendChild(a);a.select();try{document.execCommand("copy");ok()}catch(e){toast("Не удалось скопировать")}a.remove()}
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(ok,fb);else fb();
 }
