@@ -236,6 +236,10 @@ body:not(.rd) #dbar{opacity:0;pointer-events:none}
 .pic{float:right;clear:right;width:48%;margin:10px 0 18px 22px;padding:8px;background:#fff;box-shadow:0 6px 16px rgba(0,0,0,.35);transform:rotate(2.2deg);position:relative;transition:transform .35s var(--ease),box-shadow .35s}
 .pic.l{float:left;clear:left;margin:10px 22px 18px 4px;transform:rotate(-2.4deg)}
 .pic:hover{transform:rotate(0) scale(1.03);box-shadow:0 12px 26px rgba(0,0,0,.4)}
+.pdel{position:absolute;top:-9px;right:-9px;width:24px;height:24px;padding:0;border:0;border-radius:50%;background:#1a1a1a;color:#efe6cf;font:600 17px/24px var(--ui);display:none;z-index:6;box-shadow:0 2px 6px rgba(0,0,0,.5)}
+.pic:hover .pdel{display:block}
+@media(hover:none){.pdel{display:block}}
+.pic.mini .pdel{width:20px;height:20px;font-size:14px;line-height:20px;top:-8px;right:-8px}
 .pic img{display:block;width:100%;height:auto}
 /* лёгкий плёночный фильтр для всех вклеенных фото: тёплый тон, мягкий контраст, виньетка и едва заметный засвет; чтение не мешает */
 .pic img,#zoom img{filter:sepia(.16) saturate(1.1) contrast(.93) brightness(1.04) hue-rotate(-4deg)}
@@ -283,13 +287,18 @@ body:not(.rd) #dbar{opacity:0;pointer-events:none}
 #hints .ha{fill:none;stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));transition:opacity .3s}
 @keyframes hdraw{to{stroke-dashoffset:0}}
 @keyframes hfade{from{opacity:0;transform:translateX(-50%) translateY(4px) rotate(-2deg)}to{opacity:1;transform:translateX(-50%) rotate(-2deg)}}
-#hints .hl{position:absolute;transform:translateX(-50%) rotate(-2deg);font:400 26px/1.15 "Bad Script",var(--disp),cursive;text-align:center;opacity:0;animation:hfade .5s ease forwards;text-shadow:0 1px 4px #000,0 0 12px rgba(0,0,0,.85);transition:opacity .3s;pointer-events:none}
+#hints .hl{position:absolute;transform:translateX(-50%) rotate(-2deg);font:400 26px/1.15 "Bad Script",var(--disp),cursive;text-align:center;opacity:0;text-shadow:0 1px 4px #000,0 0 12px rgba(0,0,0,.85);transition:opacity .3s;pointer-events:none}
+#hints .hl{background:rgba(10,10,10,.78);padding:8px 14px 6px;border-radius:16px}
+#hints .hl.shown{animation:hfade .5s ease .5s forwards}
+#hints .hnote{animation:hfade .5s ease .1s forwards}
 #hints .hl.bye{opacity:0!important}
-#hints .hnote{background:rgba(12,12,12,.9);padding:16px 22px 12px;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.6);color:#f3ead2!important;font-size:24px!important;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));max-width:min(520px,90vw)!important;animation-delay:.1s}
+#hints .hnote{background:rgba(12,12,12,.9);padding:16px 22px 12px;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.6);color:#f3ead2!important;font-size:24px!important;max-width:min(296px,90vw);animation-delay:.1s;font-size:21px!important}
 #hints .hok,#hints .hno{pointer-events:auto;border:0;border-radius:999px;background:var(--btn);color:#efe6cf;font:500 14px var(--ui);padding:7px 18px;margin-top:8px;box-shadow:0 2px 8px rgba(0,0,0,.5);text-shadow:none}
 #hints .hok:hover,#hints .hno:hover{background:var(--btnh)}
 #hints .hno{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom));margin:0}
 #hints .ht{pointer-events:none}
+body.hinting #toast{display:none!important}
+@media(max-width:899px){#hints .hl{font-size:19px;padding:6px 10px 4px}#hints .hnote{font-size:17px!important;padding:12px 16px 8px}#hints .hok{padding:5px 14px;margin-top:5px;font-size:13px}}
 .setsec{border-top:1px solid #2a2a2a;margin:18px 0 0;padding-top:14px}
 .setsec h3{font:600 16px var(--ui);margin:0 0 6px;letter-spacing:.02em}
 .setsec .mt2{font-size:14px;margin:0 0 10px}
@@ -470,7 +479,7 @@ var Y0=Object.keys(RAW).sort(),CURY=String(new Date().getFullYear());
 if(!RAW[CURY])RAW[CURY]=[];   // папка текущего года есть всегда: в неё пишутся новые дни
 var YEARS=Object.keys(RAW).sort();
 var $=function(id){return document.getElementById(id)};
-var BUILD="22.11.2026 03:21";
+var BUILD="22.11.2026 03:48";
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е")}
 function safeLS(f){try{return f()}catch(e){return null}}
@@ -576,7 +585,7 @@ function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
 function geo(rm,rd){
   var st=$("stage"),sw=st.clientWidth,sh=st.clientHeight,mob=sw<700,N=YEARS.length,pad=14,top=8;
   var R=pad+(rm||38)+(rd||84)+pad,W,tw,th;
-  if(mob){W=sw-24;tw=60;th=36}
+  if(mob){W=sw-24;tw=86;th=38}
   else{
     W=Math.max(380,sh-top-20-50-14);                 // ширина папки = высота места чтения
     tw=Math.round(clamp(W*0.2,130,190));
@@ -1023,7 +1032,7 @@ function zoomRemote(path,thumb){
 function dayPhotos(d){
   if(!d)return Promise.resolve([]);
   if(PHC[d.d])return Promise.resolve(PHC[d.d]);
-  var list=(d.p||[]).map(function(f){return {src:purl(d,f),key:f,fs:true}});
+  var list=(d.p||[]).filter(function(f){return PDEL.indexOf(f)<0}).map(function(f){return {src:purl(d,f),key:f,fs:true}});
   if(window.__SHELL){
     // телефон: крошечные превью с Диска (хранятся на устройстве), полное фото по нажатию
     return shellThumbs(d.y).then(function(map){
@@ -1034,7 +1043,7 @@ function dayPhotos(d){
     })});
   }
   return userPhotos(d.d).then(function(arr){
-    arr.forEach(function(it){if((d.p||[]).indexOf(it.name)<0)list.push({src:URL.createObjectURL(it.blob),key:it.name})});
+    arr.forEach(function(it){if((d.p||[]).indexOf(it.name)<0&&PDEL.indexOf(it.name)<0)list.push({src:URL.createObjectURL(it.blob),key:it.name})});
     return Promise.all(list.map(function(o){
       // не загрузилось по пути рядом с HTML: пробуем через уже выданный доступ к папке «Дневники»
       return loadImg(o).then(function(r){return r||(o.fs?photoFromRoot(d,o.key).then(function(u){return u?loadImg({src:u,key:o.key}):null}):null)});
@@ -1233,7 +1242,33 @@ function photoFromRoot(d,f){
       .then(function(file){return URL.createObjectURL(file)});
   }).catch(function(){return null});
 }
-document.addEventListener("click",function(e){var p=e.target.closest&&e.target.closest(".paper .pic,.wpics .pic");if(p){var im=p.querySelector("img"),full=p.getAttribute("data-full");if(full&&window.__SHELL&&SY&&SY.url){zoomRemote(full,im.src)}else if(im)openZoom(im.src)}});
+var PDEL=(safeLS(function(){return JSON.parse(localStorage.getItem("dn_photo_del")||"[]")})||[]).concat(/*DEL*/[]);
+function removePhoto(date,name){
+  // убрать добавленное по ошибке фото: из памяти читалки, из папки «Фото» (если доступ уже выдан) и из списка кадров дня
+  PDEL.push(name);safeLS(function(){localStorage.setItem("dn_photo_del",JSON.stringify(PDEL))});
+  return userPhotos(date).then(function(arr){return idbSet("photos:"+date,arr.filter(function(x){return x.name!==name}))}).catch(function(){}).then(function(){
+    delete PHC[date];
+    var y=date.slice(0,4);
+    return (window.__testRoot?Promise.resolve(window.__testRoot):idbGet("root")).then(function(h){
+      if(!h)return;
+      return (h.queryPermission?h.queryPermission({mode:"readwrite"}):Promise.resolve("granted")).then(function(pm){
+        if(pm!=="granted")return;
+        return h.getDirectoryHandle("Фото").then(function(f){return f.getDirectoryHandle(y)}).then(function(dd){return dd.removeEntry(name)});
+      });
+    }).catch(function(){});
+  });
+}
+function askRemovePhoto(date,name,done){
+  var m=$("modal");m.hidden=false;
+  m.innerHTML='<div class="mcard dk"><h2>Убрать это фото?</h2><p class="mt2">Фото пропадёт из этого дня. Остальные фото и текст останутся.</p><div class="acts"><button class="pill" id="pdy">Убрать</button><button class="pill" id="pdn">Оставить</button></div></div>';
+  $("pdn").onclick=function(){m.hidden=true};
+  $("pdy").onclick=function(){m.hidden=true;removePhoto(date,name).then(done)};
+}
+document.addEventListener("click",function(e){
+  var db=e.target.closest&&e.target.closest(".pdel");
+  if(db){e.stopPropagation();e.preventDefault();var date=curDay?curDay.d:todayInfo().key,nm=db.getAttribute("data-name");
+    askRemovePhoto(date,nm,function(){var fg=db.closest(".pic");if(S.mode==="write"){if(fg)fg.remove()}else if(curDay)showDay(false);toast("Фото убрано",3000)});return}
+  var p=e.target.closest&&e.target.closest(".paper .pic,.wpics .pic");if(p){var im=p.querySelector("img"),full=p.getAttribute("data-full");if(full&&window.__SHELL&&SY&&SY.url){zoomRemote(full,im.src)}else if(im)openZoom(im.src)}});
 function openZoom(src){var z=$("zoom");z.innerHTML='<img alt="" src="'+src+'">';z.classList.add("on")}
 function closeZoom(){var z=$("zoom");z.classList.remove("on");z.innerHTML=""}
 $("zoom").onclick=closeZoom;
@@ -1263,8 +1298,9 @@ function writePhotoToFolder(year,name,blob){
   }).then(function(){return true},function(){return false});
 }
 function isChek(name){return /__chek/.test(name)}
+function isAdded(name){return /__(add|chek)/.test(name||"")}
 function picInner(src,name,imgStyle){
-  var im='<img alt="" src="'+src+'"'+(imgStyle?' style="'+imgStyle+'"':'')+'>';
+  var im='<img alt="" src="'+src+'"'+(imgStyle?' style="'+imgStyle+'"':'')+'>'+(isAdded(name)?'<button class="pdel" type="button" data-name="'+esc(name)+'" title="Убрать это фото" aria-label="Убрать это фото">×</button>':'');
   return isChek(name)?'<span class="rl">ЧЕК</span><div class="rp">'+im+'</div>':im;
 }
 function askKind(btn,cb){
@@ -1301,8 +1337,8 @@ function addPhoto(){var d=curDay,b=$("addph");askKind(b,function(kind){addPhotoF
 var tt=null;
 function toast(msg,ms){var t=$("toast");t.textContent=msg;t.style.display="block";clearTimeout(tt);tt=setTimeout(function(){t.style.display="none"},ms||2500)}
 function doCopyText(text){
-  var ok=function(){toast("Код скопирован: отправьте его отцу вместе со ссылкой",5000)};
-  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(ok,function(){window.prompt("Скопируйте код:",text)});else window.prompt("Скопируйте код:",text);
+  var ok=function(){toast("Код скопирован: перешли его вместе со ссылкой",5000)};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(ok,function(){window.prompt("Скопируй код:",text)});else window.prompt("Скопируй код:",text);
 }
 function doCopy(){
   var text=curDay.dd+" "+MONTHS[curDay.m-1]+" "+curDay.y+", "+curDay.w+"\n"+curDay.t;
@@ -1312,7 +1348,7 @@ function doCopy(){
 }
 
 /* ---------- сохранение правки ---------- */
-var NOTE="Изменения есть только на этом устройстве. Чтобы увидеть их на другом, перенесите туда заново файл Дневники.html";
+var NOTE="Изменения есть только на этом устройстве. Чтобы увидеть их на другом, перенеси туда заново файл Дневники.html";
 function idb(){return new Promise(function(res,rej){var r=indexedDB.open("dnevniki",1);r.onupgradeneeded=function(){r.result.createObjectStore("kv")};r.onsuccess=function(){res(r.result)};r.onerror=function(){rej(r.error)}})}
 function idbGet(k){return idb().then(function(db){return new Promise(function(res,rej){var q=db.transaction("kv").objectStore("kv").get(k);q.onsuccess=function(){res(q.result)};q.onerror=function(){rej(q.error)}})})}
 function idbSet(k,v){return idb().then(function(db){return new Promise(function(res,rej){var t=db.transaction("kv","readwrite");t.objectStore("kv").put(v,k);t.oncomplete=res;t.onerror=function(){rej(t.error)}})})}
@@ -1320,7 +1356,7 @@ function askFolder(){
   // одна понятная фраза перед системным окном выбора папки
   return new Promise(function(res,rej){
     var m=$("modal");m.hidden=false;
-    m.innerHTML='<div class="mcard dk"><h2>Выберите папку «Дневники»</h2><p class="mt2">Это та папка, где лежат Дневники.html и папка «Тексты». Через неё читалка запишет новый день в файл и найдёт модель голоса. Выберите её в следующем окне.</p><div class="acts"><button class="pill" id="fok">Выбрать папку</button><button class="pill" id="fno">Не сейчас</button></div></div>';
+    m.innerHTML='<div class="mcard dk"><h2>Выбери папку «Дневники»</h2><p class="mt2">Это та папка, где лежат Дневники.html и папка «Тексты». Через неё читалка запишет новый день в файл и найдёт модель голоса. Выбери её в следующем окне.</p><div class="acts"><button class="pill" id="fok">Выбрать папку</button><button class="pill" id="fno">Не сейчас</button></div></div>';
     $("fok").onclick=function(){m.hidden=true;res()};
     $("fno").onclick=function(){m.hidden=true;var e=new Error("aborted");e.name="AbortError";rej(e)};
   });
@@ -1383,7 +1419,7 @@ function doSave(){
   function done(msg){saveEdit(d,text);S.edit=false;renderDay(true);toast(msg,10000);setTimeout(syQuiet,400)}
   function viaDownload(){
     saveEdit(d,text);setTimeout(syQuiet,400);downloadYear(String(d.y));S.edit=false;renderDay(true);
-    toast("Исправленный файл "+d.y+".txt скачан. Положите его в папку «Тексты», заменив старый. "+NOTE,12000);
+    toast("Исправленный файл "+d.y+".txt скачан. Положи его в папку «Тексты», заменив старый. "+NOTE,12000);
   }
   if(window.__SHELL){saveEdit(d,text);S.edit=false;renderDay(true);toast("Сохранено и отправляется на Google Диск",6000);setTimeout(syQuiet,400);return}
   if(!("showDirectoryPicker" in window))return viaDownload();
@@ -1411,7 +1447,7 @@ function saveCopyFile(html,okMsg){
   // записывает Дневники.html на место, если папка выбрана; иначе скачивает
   var viaDl=function(){
     var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([html],{type:"text/html"}));a.download="Дневники.html";
-    document.body.appendChild(a);a.click();a.remove();toast("Новая копия Дневники.html сохранена в папку загрузок. Положите её вместо старой. "+(okMsg||""),12000);
+    document.body.appendChild(a);a.click();a.remove();toast("Новая копия Дневники.html сохранена в папку загрузок. Положи её вместо старой. "+(okMsg||""),12000);
   };
   if(!window.showDirectoryPicker&&!window.__testRoot)return Promise.resolve(viaDl());
   return getRoot().then(function(root){
@@ -1765,7 +1801,7 @@ function openWrite(restore){
   var inner='<div class="hd"><span class="mrg">'+t.w+' · '+pad2(t.dd)+'.'+pad2(t.m)+'.'+t.y+'</span><h1>'+t.dd+' '+MONTHS[t.m-1]+'</h1></div>'+
     '<div class="wqrow"><p class="wq" id="wq"></p><button class="pill sm" id="wqn">Другой вопрос</button></div>'+
     '<textarea id="wtext" spellcheck="true" placeholder="Здесь появится текст. Его можно поправить руками."></textarea><div class="wpics" id="wpics"></div>'+
-    '<div class="wrec"><button class="rec" id="rec" aria-label="Записать голос"><span></span></button><div class="rst" id="rst">Нажмите и говорите</div></div>';
+    '<div class="wrec"><button class="rec" id="rec" aria-label="Записать голос"><span></span></button><div class="rst" id="rst">Нажми и говори</div></div>';
   var lf=makeLeaf(null,null,leafBox(),null,inner);lf.classList.add("cur");up.appendChild(lf);
   var b=placeBar();
   b.innerHTML='<div class="acts c bar dk"><button class="pill" id="wsave">Сохранить</button><button class="cam" id="wph" title="Вклеить фото или чек" aria-label="Вклеить фото или чек">'+ICAM+'</button></div>';
@@ -1774,7 +1810,7 @@ function openWrite(restore){
 function writeBuildMob(t){
   var inner='<div class="sheet" style="padding-left:92px"><div class="body wsh"><span class="mrg">'+t.w+' · '+pad2(t.dd)+'.'+pad2(t.m)+'.'+t.y+'</span><h1>'+t.dd+' '+MONTHS[t.m-1]+'</h1>'+
     '<p class="wq" id="wq"></p><button class="pill sm" id="wqn">Другой вопрос</button>'+
-    (window.__SHELL||matchMedia("(pointer:coarse)").matches?'<div class="rst" id="rst">Чтобы надиктовать, нажмите значок микрофона на клавиатуре телефона</div>':'<div class="recrow"><button class="rec" id="rec" aria-label="Записать голос"><span></span></button><div class="rst" id="rst">Нажмите и говорите</div></div>')+
+    (window.__SHELL||matchMedia("(pointer:coarse)").matches?'<div class="rst" id="rst">Чтобы надиктовать, нажми значок микрофона на клавиатуре телефона</div>':'<div class="recrow"><button class="rec" id="rec" aria-label="Записать голос"><span></span></button><div class="rst" id="rst">Нажми и говори</div></div>')+
     '<textarea id="wtext" spellcheck="true" placeholder="Здесь появится текст. Его можно поправить руками."></textarea><div class="wpics" id="wpics"></div></div></div>';
   var h=wrapFolder(inner,t.y).replace('<div class="sw">','<div class="sw wsw">').replace('<div class="folder" style="'+palStyle(t.y)+'"','<div class="folder" style="--fc:#2f55d4;--tc:#fff"');
   $("view").innerHTML=h+'<div class="acts c dk wact"><button class="pill" id="wsave">Сохранить</button><button class="cam" id="wph" title="Вклеить фото или чек" aria-label="Вклеить фото или чек">'+ICAM+'</button></div>';
@@ -1820,8 +1856,8 @@ function toggleRec(){
       $("rec").classList.remove("on");
       transcribe(new Blob(W.chunks,{type:W.rec.mimeType}));
     };
-    W.rec.start();$("rec").classList.add("on");setSt("Слушаю… Нажмите ещё раз, чтобы закончить");
-  },function(){setSt("Нет доступа к микрофону. Разрешите его в браузере")});
+    W.rec.start();$("rec").classList.add("on");setSt("Слушаю… Нажми ещё раз, чтобы закончить");
+  },function(){setSt("Нет доступа к микрофону. Разреши его в браузере")});
 }
 function toMono16k(blob){
   return blob.arrayBuffer().then(function(buf){
@@ -1870,7 +1906,7 @@ function transcribe(blob){
     var ta=$("wtext");
     if(ta&&txt){ta.value=(ta.value.replace(/\s+$/,"")+(ta.value.trim()?"\n":"")+txt);saveDraft(true)}
     var how=VOICE.info?(VOICE.info.v==="small-q8"?"маленькая модель, ":"")+(VOICE.info.dev==="webgpu"?"на видеокарте":"на процессоре")+", "+Math.max(1,Math.round((Date.now()-t0)/1000))+" с":"";
-    setSt(txt?"Готово"+(how?" ("+how+")":"")+". Можно поправить текст или записать ещё":"Ничего не расслышала, попробуйте ещё раз");
+    setSt(txt?"Готово"+(how?" ("+how+")":"")+". Можно поправить текст или записать ещё":"Ничего не расслышала, попробуй ещё раз");
   },function(e){setSt(voiceErr(e))}).then(function(){W.busy=false;var b=$("rec");if(b)b.classList.remove("wait");if(VOICE.rel||!W.open)releaseVoice();else idleVoice()});
 }
 function voiceErr(e){
@@ -1998,7 +2034,7 @@ function saveEntry(){
   };
   if(window.__SHELL){mem();W.open=false;openDay(t.key);toast("Запись сохранена и отправляется на Google Диск",6000);setTimeout(syQuiet,400);return}
   var done=function(msg){mem();qSyncFile().catch(function(){});setTimeout(syQuiet,400);W.open=false;openDay(t.key);toast(msg,10000)};
-  if(!("showDirectoryPicker" in window)){mem();setTimeout(syQuiet,400);downloadYear(String(t.y));W.open=false;openDay(t.key);toast("Файл "+t.y+".txt скачан. Положите его в папку «Тексты». "+NOTE,12000);return}
+  if(!("showDirectoryPicker" in window)){mem();setTimeout(syQuiet,400);downloadYear(String(t.y));W.open=false;openDay(t.key);toast("Файл "+t.y+".txt скачан. Положи его в папку «Тексты». "+NOTE,12000);return}
   getRoot().then(function(root){
     return textsDir(root).then(function(dir){return dir.getFileHandle(t.y+".txt",{create:true})}).then(function(fh){
       return fh.getFile().then(function(f){return f.text()}).then(function(raw){
@@ -2008,7 +2044,7 @@ function saveEntry(){
     });
   }).then(function(){done("Запись сохранена в «Тексты/"+t.y+".txt». "+NOTE)},function(e){
     if(e&&e.name==="AbortError"){toast("Сохранение отменено");return}
-    mem();setTimeout(syQuiet,400);downloadYear(String(t.y));W.open=false;openDay(t.key);toast("Файл "+t.y+".txt скачан. Положите его в папку «Тексты». "+NOTE,12000);
+    mem();setTimeout(syQuiet,400);downloadYear(String(t.y));W.open=false;openDay(t.key);toast("Файл "+t.y+".txt скачан. Положи его в папку «Тексты». "+NOTE,12000);
   });
 }
 
@@ -2024,7 +2060,7 @@ function openSettings(){
     '<div class="setsec pw"><h3>Пароль</h3><p class="mt2" id="pwt"></p><div class="acts"><button class="pill sm" id="pwset"></button><button class="pill sm" id="pwoff" hidden>Убрать пароль</button></div></div>'+
     '<div class="setsec"><h3>Версия</h3><p class="mt2">Сборка от '+BUILD+'</p></div><div class="setsec"><h3>Google Диск</h3><p class="mt2">Записи сохраняются на Диске и подтягиваются на другом устройстве при открытии. Адрес и ключ даёт скрипт из папки «Google Диск».</p>'+
     '<input class="fld" id="syu" placeholder="Адрес синхронизации (https://script.google.com/…)"><input class="fld" id="syk" placeholder="Ключ"><div class="acts"><button class="pill sm" id="syon">Включить и синхронизировать</button><button class="pill sm" id="syoff" hidden>Выключить</button></div><div class="acts"><button class="pill sm" id="sycode" hidden>Скопировать код для телефона</button><button class="pill sm" id="sypush" hidden>Отправить дневник на Диск</button></div><div class="pst" id="syst"></div></div></div>';
-  var hasPw=!!DNC.pw;$("pwt").textContent=hasPw?"Пароль установлен. Данные в файле зашифрованы.":"Пароля нет. Установите, чтобы дневник никто не прочитал.";
+  var hasPw=!!DNC.pw;$("pwt").textContent=hasPw?"Пароль установлен. Данные в файле зашифрованы.":"Пароля нет. Установи, чтобы дневник никто не прочитал.";
   $("pwset").textContent=hasPw?"Сменить пароль":"Установить пароль";$("pwoff").hidden=!hasPw;
   $("pwset").onclick=function(){pwDialog("set")};$("pwoff").onclick=function(){pwDialog("off")};
   var syShow=function(){var t=safeLS(function(){return localStorage.getItem("dn_sync_t")});$("syu").value=SY&&SY.url||"";$("syk").value=SY&&SY.key||"";$("syoff").hidden=!(SY&&SY.url);$("syst").textContent=SY&&SY.url?(t?"Последняя синхронизация: "+new Date(+t).toLocaleString("ru-RU"):"Ещё не синхронизировано"):""};
@@ -2035,7 +2071,7 @@ function openSettings(){
     syRun().then(function(r){syShow();$("syst").textContent="Готово. С Диска получено записей: "+r.changed+(r.up?", на Диск отправлено"+"":"")},function(e){$("syst").textContent="Не получилось: "+(e&&e.message||e)});
   };
   $("sycode").hidden=!(SY&&SY.url);$("sypush").hidden=!(SY&&SY.url)||!!window.__SHELL;
-  $("sypush").onclick=function(){$("syst").textContent="Отправляю дневник на Диск…";pushBase().then(function(){$("syst").textContent=DNC.pw?"Дневник отправлен на Диск и зашифрован Вашим паролем":"Дневник отправлен на Диск"},function(e){$("syst").textContent="Не получилось: "+(e&&e.message||e)})};
+  $("sypush").onclick=function(){$("syst").textContent="Отправляю дневник на Диск…";pushBase().then(function(){$("syst").textContent=DNC.pw?"Дневник отправлен на Диск и зашифрован твоим паролем":"Дневник отправлен на Диск"},function(e){$("syst").textContent="Не получилось: "+(e&&e.message||e)})};
   $("sycode").onclick=function(){var c=btoa(unescape(encodeURIComponent(JSON.stringify({u:SY.url,k:SY.key}))));doCopyText(c)};
   $("syoff").onclick=function(){SY=null;safeLS(function(){localStorage.setItem("dn_sync",JSON.stringify({off:1}))});syShow();$("syst").textContent="Выключено"};
   $("mx").onclick=function(){m.hidden=true};
@@ -2150,7 +2186,7 @@ function syQuiet(){if(SY&&SY.url)syRun().then(function(r){if(r.changed)toast("С
 setTimeout(syQuiet,1500);
 function pushBase(){
   // дневник для телефона: исходные тексты (без правок этого устройства), шифруются паролем, если он установлен
-  if(!SY||!SY.url)return Promise.reject(new Error("Сначала включите синхронизацию"));
+  if(!SY||!SY.url)return Promise.reject(new Error("Сначала включи синхронизацию"));
   var o={};YEARS.forEach(function(y){o[y]=(RAW[y]||[]).filter(function(d){return !NEWDAYS[d.d]}).map(function(d){return {d:d.d,w:d.w,t:d.base!==undefined?d.base:d.t,p:d.p}})});
   var json=JSON.stringify(o).replace(/<\//g,"<\\/");
   return (DNC.pw?DNC.enc(json,DNC.pw):Promise.resolve(json)).then(function(txt){return syPut(SY.url,SY.key,txt,"base")});
@@ -2159,7 +2195,7 @@ function pwDialog(mode){
   var m=$("modal");m.hidden=false;
   m.innerHTML='<div class="mcard dk"><button class="mx" id="mx" aria-label="Закрыть">✕</button><h2>'+(mode==="off"?"Убрать пароль":"Пароль на дневник")+'</h2>'+
     (mode==="off"?'<p class="mt2">Дневник будет открываться без пароля. Новая копия Дневники.html сохранится без шифрования.</p>':
-     '<p class="mt2">Без пароля дневник не откроется. Если забудете, восстановить его нельзя, поэтому запишите пароль. Файл Дневники.html будет заменён зашифрованным.</p><input class="fld" id="pw1" type="password" placeholder="Новый пароль" autocomplete="new-password"><input class="fld" id="pw2" type="password" placeholder="Повторите пароль" autocomplete="new-password">')+
+     '<p class="mt2">Без пароля дневник не откроется. Если забудете, восстановить его нельзя, поэтому запиши пароль. Файл Дневники.html будет заменён зашифрованным.</p><input class="fld" id="pw1" type="password" placeholder="Новый пароль" autocomplete="new-password"><input class="fld" id="pw2" type="password" placeholder="Повтори пароль" autocomplete="new-password">')+
     '<div class="acts"><button class="pill" id="pwok">'+(mode==="off"?"Убрать":"Сохранить")+'</button></div><div class="pst" id="pwm"></div></div>';
   $("mx").onclick=function(){m.hidden=true};
   $("pwok").onclick=function(){
@@ -2174,69 +2210,166 @@ function pwDialog(mode){
 
 /* ---------- подсказки первого запуска: стрелки «от руки», показываются при каждом запуске, пока не нажмут «Больше не показывать» ---------- */
 function showHints(){
+  // шрифт подписей подгружается до раскладки, иначе размеры подписей измерятся по запасному шрифту
+  if(document.fonts&&document.fonts.load&&!showHints.f){showHints.f=1;document.fonts.load('26px "Bad Script"',"Ааб").then(showHints,showHints);return}
   var off=safeLS(function(){return localStorage.getItem("dn_hints_off")});if(off||$("hints"))return;
   var mob=G.mob,W=innerWidth,H=innerHeight,svgNS="http://www.w3.org/2000/svg",cols=["#1fb87a","#b06be8","#4f9bf0","#f0c42f","#ef5a50","#f2a31c"];
-  var R=rng(777),T=mob?[
-    {sel:"#writeBtn",txt:"Здесь продолжают дневник: голосом или текстом",ax:.24,ay:.3,col:1},
-    {sel:"#q",txt:"Поиск по словам и датам",ax:.46,ay:.19,col:2},
-    {sel:"#calBtn",txt:"Календарь",ax:.78,ay:.3,col:3},
-    {sel:"#setBtn",txt:"Настройки: пароль, синхронизация",ax:.7,ay:.46,col:4},
-    {sel:'.fold[data-i="6"] .ft',txt:"Нажмите на год, потом выберите месяц и день",ax:.5,ay:.68,col:0}
-  ]:[
-    {sel:"#writeBtn",txt:"Здесь продолжают дневник: голосом или текстом",ax:.13,ay:.3,col:1},
-    {sel:"#q",txt:"Поиск по словам и датам",ax:.86,ay:.36,col:2},
-    {sel:"#calBtn",txt:"Календарь",ax:.8,ay:.25,col:3},
-    {sel:"#setBtn",txt:"Настройки: пароль, синхронизация",ax:.91,ay:.16,col:4},
-    {sel:'.fold[data-i="6"] .ft',txt:"Нажмите на год, потом выберите месяц и день",ax:.87,ay:.52,col:0}
+  var R=rng(777),T=[
+    {sel:"#writeBtn",txt:"Здесь можешь продолжить дневник голосом или текстом",col:1},
+    {sel:"#q",txt:"Поиск по словам и датам, рядом календарь",col:2},
+    {sel:"#setBtn",txt:"Настройки: пароль, синхронизация",col:4},
+    {sel:'.fold[data-i="6"] path.tb',txt:"Нажми на год, потом выбери месяц и день",col:0}
   ];
+  T=T.filter(function(h){return !(mob&&h.desktop)});
   var ov=document.createElement("div");ov.id="hints";
   var svg=document.createElementNS(svgNS,"svg");svg.setAttribute("width",W);svg.setAttribute("height",H);ov.appendChild(svg);
   document.body.appendChild(ov);
-  var live=0,timers=[],gone=false;
-  var finish=function(){if(gone)return;gone=true;timers.forEach(clearTimeout);ov.classList.add("out");setTimeout(function(){ov.remove()},300)};
+  var timers=[],gone=false,live=0;
+  var finish=function(){if(gone)return;gone=true;timers.forEach(clearTimeout);document.body.classList.remove("hinting");window.__hintNext=null;ov.classList.add("out");setTimeout(function(){ov.remove()},300)};
+  var okBtn=function(label,cb){var b=document.createElement("button");b.className="hok";b.textContent=label||"Понятно";b.onclick=cb;return b};
+  /* ---- геометрия: подписи и стрелки раскладываются заранее и не пересекаются ни друг с другом, ни с кнопками ---- */
+  var PAD=15;
+  function rI(a,b){return a.l<b.r&&b.l<a.r&&a.t<b.b&&b.t<a.b}
+  function rP(r,p){return {l:r.l-p,t:r.t-p,r:r.r+p,b:r.b+p}}
+  function sI(p1,p2,p3,p4){
+    function o(a,b,c){return (b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0])}
+    var d1=o(p3,p4,p1),d2=o(p3,p4,p2),d3=o(p1,p2,p3),d4=o(p1,p2,p4);
+    return ((d1>0)!==(d2>0))&&((d3>0)!==(d4>0));
+  }
+  function sR(p1,p2,r){
+    if(p1[0]>r.l&&p1[0]<r.r&&p1[1]>r.t&&p1[1]<r.b)return true;if(p2[0]>r.l&&p2[0]<r.r&&p2[1]>r.t&&p2[1]<r.b)return true;
+    var c=[[r.l,r.t],[r.r,r.t],[r.r,r.b],[r.l,r.b]];
+    for(var i=0;i<4;i++)if(sI(p1,p2,c[i],c[(i+1)%4]))return true;return false;
+  }
+  function pR(pts,r){for(var i=1;i<pts.length;i++)if(sR(pts[i-1],pts[i],r))return true;return false}
+  function pP(a,b,gap){
+    for(var i=1;i<a.length;i++)for(var j=1;j<b.length;j++){
+      if(sI(a[i-1],a[i],b[j-1],b[j]))return true;
+    }
+    for(i=0;i<a.length;i++)for(j=0;j<b.length;j++)if(Math.hypot(a[i][0]-b[j][0],a[i][1]-b[j][1])<gap)return true;
+    return false;
+  }
+  function curve(sx,sy,ex,ey,noise){
+    var mx=(sx+ex)/2-(ey-sy)*0.18,my=(sy+ey)/2+(ex-sx)*0.18,pts=[],n=16;
+    for(var k=0;k<=n;k++){var u=k/n,x=(1-u)*(1-u)*sx+2*(1-u)*u*mx+u*u*ex,y=(1-u)*(1-u)*sy+2*(1-u)*u*my+u*u*ey;pts.push(noise?[x+(R()-.5)*2.4,y+(R()-.5)*2.4]:[x,y])}
+    return pts;
+  }
   var drop=function(node,paths){
     node.classList.add("bye");paths.forEach(function(x){x.style.opacity=0});
-    setTimeout(function(){node.remove();paths.forEach(function(x){x.remove()});live--;if(live<=0&&!timers.length)finish()},350);
+    setTimeout(function(){node.remove();paths.forEach(function(x){x.remove()});live--;if(mob&&window.__hintNext){window.__hintNext();return}if(live<=0&&!timers.length)finish()},350);
   };
-  var okBtn=function(label,cb){var b=document.createElement("button");b.className="hok";b.textContent=label||"Понятно";b.onclick=cb;return b};
-  function place(lb,fx,fy){
-    lb.style.left=fx+"px";lb.style.top=fy+"px";
-    var r0=lb.getBoundingClientRect();
-    if(r0.right>W-10)lb.style.left=(fx-(r0.right-(W-10)))+"px";else if(r0.left<10)lb.style.left=(fx+(10-r0.left))+"px";
-  }
-  function step(h){
-    var el=document.querySelector(h.sel);if(!el)return;
-    var r=el.getBoundingClientRect();if(!r.width)return;
-    var tx=r.left+r.width/2,ty=r.top+r.height/2,fx=W*h.ax,fy=H*h.ay;
-    var box=document.createElement("div");box.className="hl";box.style.color=cols[h.col];box.style.maxWidth=(mob?150:210)+"px";
+  var items=T.map(function(h){
+    var el=document.querySelector(h.sel);if(!el)return null;var r=el.getBoundingClientRect();if(!r.width)return null;
+    var box=document.createElement("div");box.className="hl";box.style.color=cols[h.col];box.style.maxWidth=(mob?150:200)+"px";
+    box.style.visibility="hidden";box.style.left="0px";box.style.top="0px";box.style.animation="none";box.style.transform="none";
     var t=document.createElement("div");t.className="ht";t.textContent=h.txt;box.appendChild(t);
-    var paths=[];
-    box.appendChild(okBtn("Понятно",function(){drop(box,paths)}));
-    ov.appendChild(box);place(box,fx,fy);
-    var lr=box.getBoundingClientRect(),sx=lr.left+lr.width/2,sy=ty<fy?lr.top-4:lr.bottom+4;
-    var nx=Math.max(r.left,Math.min(sx,r.right)),ny=Math.max(r.top,Math.min(sy,r.bottom)),dx=nx-sx,dy=ny-sy,len=Math.hypot(dx,dy)||1,ex=nx-dx/len*9,ey=ny-dy/len*9;
-    var mx=(sx+ex)/2-(ey-sy)*0.22,my=(sy+ey)/2+(ex-sx)*0.22,pts=[],n=16;
-    for(var k=0;k<=n;k++){var u=k/n,x=(1-u)*(1-u)*sx+2*(1-u)*u*mx+u*u*ex,y=(1-u)*(1-u)*sy+2*(1-u)*u*my+u*u*ey;pts.push([x+(R()-.5)*2.4,y+(R()-.5)*2.4])}
-    var ang=Math.atan2(ey-pts[n-2][1],ex-pts[n-2][0]),ah=14,d="M"+pts.map(function(q){return q[0].toFixed(1)+","+q[1].toFixed(1)}).join(" L");
-    var head="M"+(ex-Math.cos(ang-0.5)*ah).toFixed(1)+","+(ey-Math.sin(ang-0.5)*ah).toFixed(1)+" L"+ex.toFixed(1)+","+ey.toFixed(1)+" L"+(ex-Math.cos(ang+0.5)*ah).toFixed(1)+","+(ey-Math.sin(ang+0.5)*ah).toFixed(1);
-    [d,head].forEach(function(dd,j){
-      var pa=document.createElementNS(svgNS,"path");pa.setAttribute("d",dd);pa.setAttribute("class","ha");pa.style.stroke=cols[h.col];
+    var it={h:h,box:box,paths:[],tr:{l:r.left,t:r.top,r:r.right,b:r.bottom}};
+    box.appendChild(okBtn("Понятно",function(){drop(box,it.paths)}));
+    ov.appendChild(box);it.w=box.offsetWidth;it.hh=box.offsetHeight;box.style.width=it.w+"px";box.style.maxWidth="none";   // ширина фиксируется, чтобы подпись не перестраивалась у края экрана
+    return it;
+  }).filter(Boolean);
+  var bottom={l:W/2-Math.min(280,W*.46),r:W/2+Math.min(280,W*.46),t:H-70,b:H};
+  var noteBox=document.createElement("div");noteBox.className="hl hnote";noteBox.style.color="#f3ead2";noteBox.style.visibility="hidden";noteBox.style.animation="none";noteBox.style.transform="none";noteBox.style.left="0px";noteBox.style.top="0px";
+  var noteT=document.createElement("div");noteT.className="ht";
+  noteT.textContent=window.__SHELL?"Добавь эту страницу на экран «Домой»: нажми «Поделиться», потом «На экран Домой». Тогда дневник откроется как приложение и сохранится на телефоне.":"Положи папку «Дневники» в надёжное место, например в «Документы», не на рабочий стол и не в «Загрузки». Если её удалить, пропадут и дневник, и фотографии.";
+  noteBox.appendChild(noteT);noteBox.appendChild(okBtn("Понятно",function(){drop(noteBox,[])}));ov.appendChild(noteBox);
+  var nW=noteBox.offsetWidth,nH=noteBox.offsetHeight;noteBox.style.width=nW+"px";noteBox.style.maxWidth="none";
+  var targets=items.map(function(it){return rP(it.tr,6)});
+  var stackR=null;if(!mob){[].forEach.call(document.querySelectorAll('#stack .fold'),function(f){var b=f.getBoundingClientRect();if(!b.width)return;stackR=stackR?{l:Math.min(stackR.l,b.left),t:Math.min(stackR.t,b.top),r:Math.max(stackR.r,b.right),b:H}:{l:b.left,t:b.top,r:b.right,b:H}});if(stackR)stackR=rP(stackR,10)}
+  function layout(order){
+    var placed=[],total=0,res=[];
+    order.forEach(function(idx){
+     var best=null;
+     [[mob?14:32,mob?50:110],[10,20]].forEach(function(cfg,pass){
+      if(best&&best.bad===0)return;
+      var it=items[idx],cand=[],step=cfg[0];
+      for(var cx=8+it.w/2;cx<=W-8-it.w/2;cx+=step)for(var cy=8+it.hh/2;cy<=H-8-it.hh/2;cy+=step){
+        var tcx=(it.tr.l+it.tr.r)/2,tcy=(it.tr.t+it.tr.b)/2,dist=Math.hypot(cx-tcx,cy-tcy);
+        if(dist<cfg[1])continue;
+        cand.push({rc:{l:cx-it.w/2,t:cy-it.hh/2,r:cx+it.w/2,b:cy+it.hh/2},cx:cx,cy:cy,sc:mob?dist:Math.abs(dist-170)});
+      }
+      cand.sort(function(a,b){return a.sc-b.sc});
+      for(var i=0;i<cand.length;i++){
+        var c=cand[i],rc=c.rc,rp=rP(rc,PAD),bad=0;
+        if(rI(rp,bottom))continue;
+        if(stackR&&rI(rp,stackR)&&!(pass&&!best))continue;   // подписи только на чёрном фоне; на папки заходят лишь если иначе места нет
+        var skip=false;for(var q=0;q<targets.length;q++)if(rI(rp,targets[q])){skip=true;break}
+        if(skip)continue;
+        for(q=0;q<placed.length;q++)if(rI(rp,placed[q].rp)){skip=true;break}
+        if(skip)continue;
+        var sx=c.cx,sy=it.tr.t>c.cy?rc.b+4:rc.t-4;
+        if(it.tr.t<=c.cy&&it.tr.b>=c.cy)sy=c.cy;
+        var nx=Math.max(it.tr.l,Math.min(sx,it.tr.r)),ny=Math.max(it.tr.t,Math.min(sy,it.tr.b)),dx=nx-sx,dy=ny-sy,len=Math.hypot(dx,dy)||1,ex=nx-dx/len*9,ey=ny-dy/len*9;
+        if(!pass&&len<(mob?45:85))continue;   // слишком короткие стрелки не берутся, пока есть выбор
+        var pts=curve(sx,sy,ex,ey,false);
+        targets.forEach(function(tr,j){var o=items[j].tr;if(j!==idx&&!(o.l<=it.tr.l&&o.r>=it.tr.r&&o.t<=it.tr.t&&o.b>=it.tr.b)&&pR(pts,tr))bad+=5});   // кнопка внутри другой цели (календарь в поле поиска) не считается пересечением
+        if(pR(pts,bottom))bad+=5;
+        placed.forEach(function(pl){if(pR(pts,pl.rp))bad+=5;if(pR(pl.pts,rp))bad+=5;if(pP(pts,pl.pts,mob?9:16))bad+=5});
+        if(!best||bad<best.bad){best={c:c,bad:bad,sx:sx,sy:sy,ex:ex,ey:ey,pts:pts};if(bad===0)break}
+      }
+     });
+     if(!best){total+=50;res[idx]=null;return}
+     total+=best.bad;if(!mob)placed.push({rp:rP(best.c.rc,PAD),pts:best.pts});res[idx]=best;
+    });
+    return {total:total,res:res,placed:placed};
+  }
+  // несколько порядков размещения, берётся лучший без пересечений
+  var n=items.length,idxs=items.map(function(_,i){return i}),orders=[idxs.slice(),idxs.slice().reverse()];
+  [[3,2,1,0,4],[2,3,4,1,0],[3,2,4,0,1],[4,3,2,1,0],[0,4,1,3,2],[0,1,2,3,4],[1,0,2,3,4],[0,3,2,1,4],[1,2,0,3,4]].forEach(function(o){var oo=o.filter(function(x){return x<n});if(oo.length===n)orders.push(oo)});
+  (function(){var all=[];(function perm(arr,rest){if(!rest.length){all.push(arr);return}rest.forEach(function(x,i){perm(arr.concat([x]),rest.slice(0,i).concat(rest.slice(i+1)))})})([],idxs.slice());all.forEach(function(o){orders.push(o)})})();
+  var bestL=null;orders.forEach(function(o){if(bestL&&bestL.total===0)return;var L=layout(o);if(!bestL||L.total<bestL.total)bestL=L});
+  (function(){
+    // заметка без стрелки: ближайшее к низу свободное место, не пересекающее кнопки, подписи и стрелки
+    var cand=[],bestN=null,stp=mob?16:24;
+    for(var cx=8+nW/2;cx<=W-8-nW/2;cx+=stp)for(var cy=8+nH/2;cy<=H-8-nH/2;cy+=stp)cand.push({cx:cx,cy:cy,sc:Math.hypot(cx-W/2,(cy-(H-nH/2-70))*1.6)});
+    cand.sort(function(a,b){return a.sc-b.sc});
+    for(var i=0;i<cand.length;i++){
+      var c=cand[i],rp=rP({l:c.cx-nW/2,t:c.cy-nH/2,r:c.cx+nW/2,b:c.cy+nH/2},PAD),ok=true;
+      if(rI(rp,bottom))continue;
+      if(stackR&&rI(rp,stackR))continue;
+      for(var q=0;q<targets.length&&ok;q++)if(rI(rp,targets[q]))ok=false;
+      bestL.placed.forEach(function(pl){if(rI(rp,pl.rp)||pR(pl.pts,rp))ok=false});
+      if(ok){bestN=c;break}
+    }
+    if(!bestN)bestN={cx:W/2,cy:H-nH/2-70};
+    noteBox.style.left=bestN.cx+"px";noteBox.style.top=(bestN.cy-nH/2)+"px";noteBox.style.transform="translateX(-50%)";
+    window.__noteRect={l:bestN.cx-nW/2,t:bestN.cy-nH/2,r:bestN.cx+nW/2,b:bestN.cy+nH/2};
+  })();
+  items.forEach(function(it,idx){
+    var best=bestL.res[idx];if(!best){it.bad=50;it.pos={cx:W/2,cy:H/2};it.arrow=null;return}
+    it.pos=best.c;it.arrow={sx:best.sx,sy:best.sy,ex:best.ex,ey:best.ey,pts:best.pts};it.bad=best.bad;
+    it.box.style.left=best.c.cx+"px";it.box.style.top=(best.c.cy-it.hh/2)+"px";it.box.style.transform="translateX(-50%)";
+    var pts=curve(best.sx,best.sy,best.ex,best.ey,true),m=pts.length-1;
+    var ang=Math.atan2(best.ey-pts[m-2][1],best.ex-pts[m-2][0]),ah=14;
+    it.d="M"+pts.map(function(q){return q[0].toFixed(1)+","+q[1].toFixed(1)}).join(" L");
+    it.head="M"+(best.ex-Math.cos(ang-0.5)*ah).toFixed(1)+","+(best.ey-Math.sin(ang-0.5)*ah).toFixed(1)+" L"+best.ex.toFixed(1)+","+best.ey.toFixed(1)+" L"+(best.ex-Math.cos(ang+0.5)*ah).toFixed(1)+","+(best.ey-Math.sin(ang+0.5)*ah).toFixed(1);
+  });
+  window.__hintLayout=items.map(function(it){return {txt:it.h.txt,bad:it.bad,sel:it.h.sel,rc:it.pos&&it.pos.rc,w:it.w,hh:it.hh}});
+  function step(it){
+    var box=it.box,paths=it.paths;
+    box.style.visibility="";box.style.animation="";box.style.transform="";   // transform/анимация берутся из CSS
+    [it.d,it.head].forEach(function(dd,j){
+      var pa=document.createElementNS(svgNS,"path");pa.setAttribute("d",dd);pa.setAttribute("class","ha");pa.style.stroke=cols[it.h.col];
       svg.appendChild(pa);paths.push(pa);var L=pa.getTotalLength();pa.style.strokeDasharray=L;pa.style.strokeDashoffset=L;
       pa.style.animation="hdraw "+(j?0.25:0.7)+"s ease-out "+(j?0.7:0)+"s forwards";
     });
-    box.style.animationDelay="0.5s";live++;
+    box.classList.add("shown");live++;
   }
   function note(){
-    var box=document.createElement("div");box.className="hl hnote";box.style.color=cols[5];
-    var t=document.createElement("div");t.className="ht";
-    t.textContent=window.__SHELL?"Добавьте эту страницу на экран «Домой»: кнопка «Поделиться», затем «На экран Домой». Тогда дневник откроется как приложение и сохранится на телефоне.":"Положите папку «Дневники» в надёжное место, например в «Документы»: не на рабочий стол и не в «Загрузки». Если её удалить, пропадут и дневник, и фотографии.";
-    box.appendChild(t);box.appendChild(okBtn("Понятно",function(){drop(box,[])}));
-    ov.appendChild(box);live++;
+    noteBox.style.visibility="";noteBox.style.animation="";noteBox.style.transform="";live++;
   }
-  // подсказки появляются по одной с паузой; у каждой своё «Понятно»; экран не затемняется
-  var gap=3600;
-  T.forEach(function(h,i){timers.push(setTimeout(function(){timers.shift();if(!isNav()){finish();return}step(h)},600+i*gap))});
-  timers.push(setTimeout(function(){timers.shift();if(!isNav()){finish();return}note()},600+T.length*gap));   // если человек уже открыл день, остальные подсказки не показываются
+  var gap=+(safeLS(function(){return localStorage.getItem("dn_hint_gap")})||3600),standalone=(navigator.standalone===true)||(window.matchMedia&&matchMedia("(display-mode: standalone)").matches);
+  document.body.classList.add("hinting");
+  if(mob){
+    // телефон: подсказки по одной, следующая появляется после «Понятно»
+    var queue=items.slice();if(!(window.__SHELL&&!standalone))noteBox.style.display="none";else queue.push({note:true});
+    var nextH=function(){if(gone)return;if(!isNav()){finish();return}var it=queue.shift();if(!it){if(live<=0)finish();return}if(it.note)note();else step(it)};
+    window.__hintNext=nextH;
+    timers.push(setTimeout(function(){timers.shift();nextH()},600));
+  }else{
+  items.forEach(function(it,i){timers.push(setTimeout(function(){timers.shift();if(!isNav()){finish();return}step(it)},600+i*gap))});
+  timers.push(setTimeout(function(){timers.shift();if(!isNav()){finish();return}note()},600+items.length*gap));
+  }
   var no=document.createElement("button");no.className="hno";no.textContent="Больше не показывать";
   no.onclick=function(){safeLS(function(){localStorage.setItem("dn_hints_off","1")});finish()};
   ov.appendChild(no);
@@ -2272,7 +2405,7 @@ renderNav();
   function run(){var s=document.createElement("script");s.id="mainrun";s.text=document.getElementById("mainjs").textContent;document.body.appendChild(s)}
   function lockScreen(t){
     var box=document.createElement("div");box.id="lock";
-    box.innerHTML='<form class="lk"><h2>Дневники</h2><p>Введите пароль, чтобы открыть</p><input id="lkp" type="password" autocomplete="current-password" autofocus placeholder="Пароль"><button type="submit" id="lkb">Открыть</button><div id="lkm"></div></form>';
+    box.innerHTML='<form class="lk"><h2>Дневники</h2><p>Введи пароль, чтобы открыть</p><input id="lkp" type="password" autocomplete="current-password" autofocus placeholder="Пароль"><button type="submit" id="lkb">Открыть</button><div id="lkm"></div></form>';
     document.body.appendChild(box);
     var f=box.querySelector("form"),inp=box.querySelector("#lkp"),msg=box.querySelector("#lkm"),busy=false;
     setTimeout(function(){inp.focus()},50);
@@ -2296,18 +2429,18 @@ renderNav();
   function fetchBase(c){return fetch(q(c,"get","&f=base&_="+Date.now()),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("http"+r.status);return r.text()}).then(function(txt){if(!txt||txt.length<100)throw new Error("empty");return fetch(q(c,"ver","&f=base&_="+Date.now()),{cache:"no-store"}).then(function(r){return r.text()}).then(function(v){return {txt:txt,ver:v}})})}
   function connectScreen(msg0){
     var box=document.createElement("div");box.id="lock";
-    box.innerHTML='<form class="lk"><h2>Дневники</h2><p>Вставьте код подключения, который прислали вместе со ссылкой</p><input id="lkc" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Код подключения"><button type="submit">Подключиться</button><div id="lkm">'+(msg0||"")+'</div></form>';
+    box.innerHTML='<form class="lk"><h2>Дневники</h2><p>Вставь код подключения, который тебе прислали вместе со ссылкой</p><input id="lkc" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Код подключения"><button type="submit">Подключиться</button><div id="lkm">'+(msg0||"")+'</div></form>';
     document.body.appendChild(box);
     var f=box.querySelector("form"),inp=box.querySelector("#lkc"),msg=box.querySelector("#lkm"),busy=false;
     f.onsubmit=function(e){
       e.preventDefault();if(busy)return;var c;
-      try{c=JSON.parse(decodeURIComponent(escape(atob(inp.value.trim()))));if(!c.u||!c.k)throw 0}catch(x){msg.textContent="Код не подошёл, проверьте, что вставлен целиком";return}
+      try{c=JSON.parse(decodeURIComponent(escape(atob(inp.value.trim()))));if(!c.u||!c.k)throw 0}catch(x){msg.textContent="Код не подошёл, проверь, что вставлен целиком";return}
       busy=true;msg.textContent="Подключаюсь, загружаю дневник…";
       var cc={url:c.u,key:c.k};
       fetchBase(cc).then(function(r){
         try{localStorage.setItem("dn_sync",JSON.stringify(cc));localStorage.setItem("dn_basever",r.ver)}catch(x){}
         return sset("base",r.txt).then(function(){box.remove();d.textContent=r.txt;proceed()});
-      },function(){busy=false;msg.textContent="Не получилось загрузить. Проверьте интернет и код";});
+      },function(){busy=false;msg.textContent="Не получилось загрузить. Проверь интернет и код";});
     };
   }
   function checkBase(){
