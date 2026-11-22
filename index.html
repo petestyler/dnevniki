@@ -509,7 +509,7 @@ var _nd=safeLS(function(){return JSON.parse(localStorage.getItem("dn_new")||"{}"
 if(!RAW[CURY]&&Object.keys(_nd).some(function(k){return k.slice(0,4)===CURY}))RAW[CURY]=[];
 var YEARS=Object.keys(RAW).sort();
 var $=function(id){return document.getElementById(id)};
-var BUILD="22.11.2026 16:24";
+var BUILD="22.11.2026 16:48";
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е")}
 function safeLS(f){try{return f()}catch(e){return null}}
@@ -1588,9 +1588,14 @@ function stem(w){
   var k=n<=5?n-1:n<=8?n-2:n-3;
   return w.slice(0,Math.min(n,Math.max(4,k)));
 }
+var HLT=null;   // хвост запроса: {m:"w"|"p",ch,tok,stem}; подсветка последнего слова точная
 function wordRe(stems){
-  var alt=stems.map(function(x){return x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}).join("|");
-  return new RegExp("("+NL+")(?:"+alt+")[а-яa-z0-9]*","g");
+  var esc1=function(x){return x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")};
+  var alt=stems.map(function(x){
+    if(HLT&&x===HLT.stem)return esc1(HLT.tok)+(HLT.m==="w"?"(?![а-яa-z0-9])":"(?="+esc1(HLT.ch)+")");
+    return esc1(x)+"[а-яa-z0-9]*";
+  }).join("|");
+  return new RegExp("("+NL+")(?:"+alt+")","g");
 }
 function wordStart(n,st){
   var i=0;
@@ -1607,20 +1612,32 @@ function phraseRe(stems){
   return new RegExp("(?<![а-яa-z0-9])"+stems.map(function(x){return esc(x)+"[а-яa-z0-9]*"}).join("(?:[^а-яa-z0-9]+[а-яa-z0-9]{1,4}){0,2}[^а-яa-z0-9]+"));
 }
 function strictStem(w){var n=w.length;return n<=5?w:n<=8?w.slice(0,n-2):w.slice(0,n-3)}
-function strictRe(tokens){
+function tailInfo(raw){
+  // как закончен запрос: «рост» (слово с любым продолжением), «рост » (пробел: только целое слово), «рост.» (знак: слово и сразу этот знак)
+  var t=raw.replace(/^\s+/,""),tr=t.replace(/\s+$/,""),m=/[.,!?;:…]$/.exec(tr);
+  if(m)return {m:"p",ch:m[0]};
+  return tr.length&&tr.length<t.length?{m:"w"}:{m:"o"};
+}
+function strictRe(tokens,T){
   // все слова запроса, включая короткие («я», «в», «на»), подряд и в том же порядке; знаки препинания между ними допускаются
   var esc=function(x){return x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")};
-  return new RegExp("(?<![а-яa-z0-9])"+tokens.map(function(w){return /^\d+$/.test(w)||w.length<4?esc(w)+"(?![а-яa-z0-9])":esc(strictStem(w))+"[а-яa-z0-9]*"}).join("[^а-яa-z0-9]+"));
+  return new RegExp("(?<![а-яa-z0-9])"+tokens.map(function(w,i){
+    if(T&&T.m!=="o"&&i===tokens.length-1)return esc(w)+(T.m==="w"?"(?![а-яa-z0-9])":esc(T.ch));
+    return /^\d+$/.test(w)||w.length<4?esc(w)+"(?![а-яa-z0-9])":esc(strictStem(w))+"[а-яa-z0-9]*"}).join("[^а-яa-z0-9]+"));
 }
 function search(raw){
   var q=parseQuery(raw),f=q.f,stems=q.words.map(stem);
-  var strict=[],relaxed=[],loose=[],sre=q.all.length>=1&&(q.all.length>1||!stems.length)?strictRe(q.all):null,pre=stems.length>1?phraseRe(stems):null;
+  var tl=tailInfo(raw),lt=q.all[q.all.length-1],T=tl.m!=="o"&&lt?tl:null,multi=q.all.length>1;
+  var TL=T&&q.words.indexOf(lt)>=0?T:null,tre=TL?new RegExp("(?<![а-яa-z0-9])"+lt.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+(TL.m==="w"?"(?![а-яa-z0-9])":TL.ch.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"))):null;
+  HLT=TL?{m:TL.m,ch:TL.ch,tok:lt,stem:stem(lt)}:null;
+  var strict=[],relaxed=[],loose=[],sre=q.all.length>=1&&(multi||!stems.length||T)?strictRe(q.all,T):null,pre=stems.length>1?phraseRe(stems):null;
   for(var i=0;i<DAYS.length;i++){
     var d=DAYS[i];
     if(f.y&&d.y!==f.y)continue;if(f.m&&d.m!==f.m)continue;if(f.d&&d.dd!==f.d)continue;
     var m;
     if(sre&&(m=sre.exec(d.n))){strict.push({d:d,pos:m.index,ex:0,i:i});continue}
     if(!stems.length&&sre)continue;   // только короткие слова: ищется точное сочетание
+    if(tre&&!tre.test(d.n))continue;   // запрос закончен пробелом или знаком: последнее слово должно быть точным
     if(pre&&(m=pre.exec(d.n))){relaxed.push({d:d,pos:m.index,ex:0,i:i});continue}
     var first=-1,ok=true;
     for(var k=0;k<stems.length;k++){
@@ -1636,7 +1653,7 @@ function search(raw){
   // сначала дни, где все слова запроса стоят подряд; если таких нет, где ключевые слова рядом (короткие пропущены); потом где слова по отдельности
   var res=strict,alt=[],noPhrase=false;
   if(!res.length&&relaxed.length)res=relaxed;
-  else if(!res.length&&(sre||pre)){alt=loose;res=[];noPhrase=true}   // сочетания нет: раздельные слова показываются только по просьбе
+  else if(!res.length&&((sre&&!(T&&!multi&&stems.length))||pre)){alt=loose;res=[];noPhrase=true}   // сочетания нет: раздельные слова показываются только по просьбе
   else if(!res.length)res=loose;
   if(stems.length){res.sort(function(a,b){return a.ex-b.ex||a.i-b.i});alt.sort(function(a,b){return a.ex-b.ex||a.i-b.i})}
   return {res:res,f:f,stems:stems,hls:stems.length?stems:q.all,hasAll:q.all.length>0,loose:false,alt:alt,noPhrase:noPhrase};
@@ -1747,7 +1764,7 @@ function runSearch(){
   var v=$("q").value.trim();
   $("qx").style.display=v?"block":"none";
   if(!v){S.results=null;S.words=[];if(S.mode==="res"){if(!G.mob&&searchOpen()){flyOpen(dkey(S.y,S.m,S.d))}else openDay(dkey(S.y,S.m,S.d))}return}
-  S.results=search(v);shown=LIM;
+  S.results=search($("q").value);shown=LIM;
   var f=S.results.f;
   // в запросе только короткие или служебные слова: ничего не ищем
   if(!S.results.stems.length&&!S.results.hasAll&&!f.y&&!f.m&&!f.d){S.results.res=[];S.results.none=true}
