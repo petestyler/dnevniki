@@ -295,6 +295,15 @@ body:not(.rd) #dbar{opacity:0;pointer-events:none}
 @media(prefers-reduced-motion:reduce){.wbtn,.ib,.pill,.cam,.nb,.mx,.mt,.dy,.hok,.hno,.vopt,.grid button,#lock button,.pdel{transition:background .2s,color .2s}.mcard,.calpop{animation:none!important}}
 
 .wz{max-width:560px}.wiz{padding-left:20px;margin:12px 0}.wiz li{margin:14px 0;line-height:1.45}.wiz b{display:block;margin-bottom:2px}.wzs{display:block;opacity:.8;margin-bottom:8px}.wiz .pill,.wiz .fld{margin-top:4px}.wiz a.pill{display:inline-flex;align-items:center;height:38px;text-decoration:none}.wz h2{padding-right:40px}
+/* избранное */
+.cam.fvb.on{color:#f2d649}.cam.fvb.on svg{fill:currentColor}
+#favBtn{left:5px!important;right:auto!important;position:absolute;top:5px}
+#favBtn.on{color:#f2d649}#favBtn.on svg{fill:currentColor}
+.sbox #q{padding-left:52px}
+.text mark.fv{background:#ffe27a;color:inherit;border-radius:3px;padding:0 1px}
+.res{position:relative}
+.favx{position:absolute;right:6px;top:6px;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;color:#7d7058;cursor:pointer}
+.favx:hover{background:rgba(0,0,0,.08);color:#3a3010}
 /* ---------- вход по паролю ---------- */
 #lock{position:fixed;inset:0;z-index:500;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
 #lock .lk{width:min(380px,100%);background:#121212;border:1px solid #2a2a2a;border-radius:22px;padding:30px 28px 24px;color:#efe8d6;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.7)}
@@ -479,8 +488,10 @@ textarea#ed{width:100%;min-height:55vh;font:400 21px/1.55 var(--read);padding:14
   #toast{bottom:calc(84px + env(safe-area-inset-bottom));max-width:86vw}
   .wact{position:fixed!important;left:8px;right:8px;bottom:0;z-index:25;margin:0!important;padding:16px 0 12px;background:linear-gradient(rgba(5,5,5,0),var(--bg) 42%)}
   #view:has(.wact){padding-bottom:84px}
-  .acts.bar{gap:6px;margin:0}
-  .bar .cam,.dk .bar .cam{width:44px;height:44px;flex:none}
+  .acts.bar{gap:4px;margin:0}
+  .bar .cam,.dk .bar .cam{width:38px;height:38px;flex:none}
+  .bar .cam svg{width:20px;height:20px}
+  #actw .bar .pill{padding-left:8px;padding-right:8px;font-size:14px}
   .bar .cam svg{width:21px;height:21px}
   .bar .pill,.dk .bar .pill{flex:1 1 0;width:auto;min-width:0;height:44px;font-size:14px;padding:0 4px;letter-spacing:-.01em}
 }
@@ -509,7 +520,7 @@ var _nd=safeLS(function(){return JSON.parse(localStorage.getItem("dn_new")||"{}"
 if(!RAW[CURY]&&Object.keys(_nd).some(function(k){return k.slice(0,4)===CURY}))RAW[CURY]=[];
 var YEARS=Object.keys(RAW).sort();
 var $=function(id){return document.getElementById(id)};
-var BUILD="22.11.2026 19:17";
+var BUILD="22.11.2026 20:25";
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е")}
 function safeLS(f){try{return f()}catch(e){return null}}
@@ -517,7 +528,7 @@ function safeLS(f){try{return f()}catch(e){return null}}
    Всё, что вводит читатель (правки, новые дни, удалённые фото, настройки), хранится в localStorage (ключи dn_*) и IndexedDB «dnevniki».
    У каждой версии программы есть номер схемы SCHEMA; при запуске данные старой схемы переводятся в новую, перед этим делается страховочная копия.
    Данные новой схемы старая программа не трогает. Фиксированные имена ключей менять нельзя: только добавлять шаги ниже. */
-var SCHEMA=2;
+var SCHEMA=3;
 function migrate(){
   var cur=+(safeLS(function(){return localStorage.getItem("dn_schema")})||0);
   if(cur>=SCHEMA)return cur;
@@ -533,6 +544,10 @@ function migrate(){
     fix("dn_edits",function(v){Object.keys(v).forEach(function(k){if(!v[k].mt)v[k].mt=1});return v});
     fix("dn_new",function(v){Object.keys(v).forEach(function(k){if(!v[k].mt)v[k].mt=1});return v});
     fix("dn_photo_del",function(v){return Array.isArray(v)?v:[]});
+  }
+  if(cur<3){
+    // схема 3: избранные дни и фразы, ключ dn_fav = {дата:{d:{on,mt},p:{ключ:{t,on,mt}}}}; удаления хранятся как on:0 (нужны синхронизации)
+    safeLS(function(){if(localStorage.getItem("dn_fav")===null)localStorage.setItem("dn_fav","{}")});
   }
   safeLS(function(){localStorage.setItem("dn_schema",String(SCHEMA))});
   return SCHEMA;
@@ -564,9 +579,110 @@ function saveEdit(d,text){
   d.t=text;d.n=norm(text);
 }
 
+/* ---------- избранное: дни целиком и отдельные фразы ---------- */
+var FAV=safeLS(function(){return JSON.parse(localStorage.getItem("dn_fav")||"{}")})||{};
+function saveFav(){safeLS(function(){localStorage.setItem("dn_fav",JSON.stringify(FAV))})}
+function fkey(t){return norm(t.replace(/\s+/g," ").trim()).slice(0,300)}
+function favSig(f){
+  var a=[];Object.keys(f||{}).forEach(function(k){var r=f[k];if(r.d)a.push(k+"|d|"+(r.d.on?1:0)+"|"+(r.d.mt||0));Object.keys(r.p||{}).forEach(function(pk){var q=r.p[pk];a.push(k+"|p|"+pk+"|"+(q.on?1:0)+"|"+(q.mt||0))})});
+  return a.sort().join("\n");
+}
+function favMerge(a,b){
+  // слияние двух списков избранного: у каждой записи побеждает более поздняя метка времени
+  var out=JSON.parse(JSON.stringify(a||{}));
+  Object.keys(b||{}).forEach(function(k){
+    var rb=b[k],ro=out[k]||(out[k]={d:null,p:{}});
+    if(rb.d&&(!ro.d||(rb.d.mt||0)>(ro.d.mt||0)))ro.d={on:rb.d.on?1:0,mt:rb.d.mt||0};
+    Object.keys(rb.p||{}).forEach(function(pk){var q=rb.p[pk];ro.p=ro.p||{};if(!ro.p[pk]||(q.mt||0)>(ro.p[pk].mt||0))ro.p[pk]={t:q.t,on:q.on?1:0,mt:q.mt||0}});
+  });
+  return out;
+}
+function favDay(k){var r=FAV[k];return !!(r&&r.d&&r.d.on)}
+function favPhrases(k){var r=FAV[k],a=[];if(r&&r.p)Object.keys(r.p).forEach(function(pk){if(r.p[pk].on)a.push(r.p[pk].t)});return a}
+function favRanges(k,t){
+  // где в тексте дня стоят сохранённые фразы (пробелы и переводы строк в них равноценны, регистр и ё/е не важны)
+  var ph=favPhrases(k);if(!ph.length)return [];
+  var n=norm(t);if(n.length!==t.length)return [];
+  var rg=[];
+  ph.forEach(function(x){
+    var w=norm(x).split(/\s+/).filter(Boolean).map(function(z){return z.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")});if(!w.length)return;
+    var re=new RegExp(w.join("\\s+"),"g"),m;
+    while((m=re.exec(n))){rg.push([m.index,m.index+m[0].length]);if(m[0].length===0)re.lastIndex++}
+  });
+  rg.sort(function(a,b){return a[0]-b[0]});
+  var mg=[];rg.forEach(function(r){var l=mg[mg.length-1];if(l&&r[0]<=l[1])l[1]=Math.max(l[1],r[1]);else mg.push(r.slice())});
+  return mg;
+}
+function escF(t,a,b,R){
+  // esc для куска текста [a,b) с подсветкой сохранённых фраз
+  var out="",p=a;
+  for(var i=0;i<R.length;i++){
+    var s0=Math.max(R[i][0],a),e0=Math.min(R[i][1],b);if(e0<=s0)continue;
+    out+=esc(t.slice(p,s0))+'<mark class="fv">'+esc(t.slice(s0,e0))+'</mark>';p=e0;
+  }
+  return out+esc(t.slice(p,b));
+}
+var LASTSEL=null;
+function selInText(s){var n=s&&s.anchorNode;n=n&&(n.nodeType===1?n:n.parentElement);var m=n&&n.closest&&n.closest(".text");return !!m&&!!(s.focusNode&&m.contains(s.focusNode))}
+document.addEventListener("selectionchange",function(){
+  // выделение запоминается: на телефоне касание кнопки может его снять раньше, чем сработает нажатие
+  var s=window.getSelection?window.getSelection():null,t=s&&!s.isCollapsed&&selInText(s)?s.toString():"";
+  if(t)LASTSEL={t:t,day:curDay&&curDay.d,gone:0};else if(LASTSEL&&!LASTSEL.gone)LASTSEL.gone=Date.now();
+});
+function takeSel(){
+  var s=window.getSelection?window.getSelection():null,t=s&&!s.isCollapsed&&selInText(s)?s.toString():"";
+  if(!t&&LASTSEL&&LASTSEL.day===(curDay&&curDay.d)&&(!LASTSEL.gone||Date.now()-LASTSEL.gone<700))t=LASTSEL.t;
+  LASTSEL=null;t=t.replace(/\s+/g," ").trim().slice(0,600);return t.length>=2?t:"";
+}
+function favStar(){
+  // звезда: без выделения весь день в избранное или обратно; с выделением в избранное идёт фраза (повторно выделенная фраза убирается)
+  var d=curDay;if(!d||S.edit)return;
+  var sel=takeSel(),rec=FAV[d.d]||(FAV[d.d]={d:null,p:{}}),now=Date.now();rec.p=rec.p||{};
+  var msg;
+  if(sel){
+    var key=fkey(sel),hit=null;
+    Object.keys(rec.p).forEach(function(pk){var q=rec.p[pk];if(q.on&&(pk===key||pk.indexOf(key)>=0||key.indexOf(pk)>=0))hit=pk});
+    if(hit){rec.p[hit]={t:rec.p[hit].t,on:0,mt:now};msg="Фраза убрана из избранного"}
+    else{rec.p[key]={t:sel,on:1,mt:now};msg="Фраза добавлена в избранное"}
+    var g=window.getSelection&&window.getSelection();if(g)g.removeAllRanges();
+  }else{
+    var on=!(rec.d&&rec.d.on);rec.d={on:on?1:0,mt:now};msg=on?"День добавлен в избранное":"День убран из избранного";
+  }
+  saveFav();toast(msg,2500);setTimeout(syQuiet,400);
+  showDay(false);
+  if(S.results&&S.results.fav)S.results=favResults();
+}
+function favResults(){
+  var res=[];
+  Object.keys(FAV).sort().forEach(function(k){
+    var d=BYDATE[k],r=FAV[k];if(!d)return;
+    if(r.d&&r.d.on)res.push({d:d,kind:"day",k:k,pk:"",pos:0,ex:0,i:0});
+    Object.keys(r.p||{}).forEach(function(pk){var q=r.p[pk];if(q.on)res.push({d:d,kind:"ph",t:q.t,k:k,pk:pk,pos:0,ex:0,i:0})});
+  });
+  return {res:res,f:{y:0,m:0,d:0},stems:[],hls:[],hasAll:true,loose:false,alt:[],noPhrase:false,fav:true};
+}
+function favSnip(r){
+  if(r.kind==="ph")return "<mark>"+esc(r.t.slice(0,400))+(r.t.length>400?" …":"")+"</mark>";
+  var t=r.d.t.replace(/\s*\n\s*/g," ").trim();return esc(t.slice(0,220))+(t.length>220?" …":"");
+}
+function favTopState(){var b=$("favBtn");if(b)b.classList.toggle("on",!!(S.mode==="res"&&S.results&&S.results.fav))}
+function toggleFavView(){
+  if(S.mode==="res"&&S.results&&S.results.fav){closeSearch();return}
+  var q=$("q");q.value="";$("qx").style.display="none";
+  S.results=favResults();shown=LIM;S.mode="res";showResults();$("main").scrollTop=0;favTopState();
+}
+function favRemove(k,pk){
+  var r=FAV[k];if(!r)return;var now=Date.now();
+  if(pk)r.p[pk]={t:r.p[pk].t,on:0,mt:now};else r.d={on:0,mt:now};
+  saveFav();setTimeout(syQuiet,400);
+  S.results=favResults();
+  if(!G.mob&&searchOpen())refreshSearchLeaf(true);else showResults();
+}
+
 /* ---------- состояние ---------- */
 var S={y:2005,m:1,d:1,cy:2005,cm:1,mode:"day",results:null,words:[],edit:false};
 var ICAL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>';
+var ISTAR='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M12 3.7l2.55 5.2 5.7.8-4.15 4 1 5.7L12 16.7 6.9 19.4l1-5.7-4.15-4 5.7-.8z"/></svg>';
 var ICAM='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.3" r="3.6"/></svg>';
 var IPEN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5 4 20z"/><path d="M13.5 7l3 3"/></svg>';
 var IGEAR='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>';
@@ -576,7 +692,7 @@ var IMENU='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
 /* ---------- каркас ---------- */
 $("app").innerHTML=
  '<div id="top"><button class="wbtn" id="writeBtn" title="Продолжить дневник">'+IPEN+'<span>Продолжить дневник</span></button>'+
- '<div class="sbox"><input id="q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Найти слово или дату"><button id="qx" aria-label="Очистить">✕</button><button class="ib sm" id="calBtn" title="Календарь" aria-label="Календарь">'+ICAL+'</button></div>'+
+ '<div class="sbox"><input id="q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Найти слово или дату"><button id="qx" aria-label="Очистить">✕</button><button class="ib sm" id="favBtn" title="Избранное" aria-label="Избранное">'+ISTAR+'</button><button class="ib sm" id="calBtn" title="Календарь" aria-label="Календарь">'+ICAL+'</button></div>'+
  '<button class="ib" id="setBtn" title="Настройки" aria-label="Настройки">'+IGEAR+'</button>'+
  '<div class="calpop" id="calpop" hidden><div class="calh"><button class="nb" id="cpy" title="Год назад">«</button><button class="nb" id="cpm" title="Месяц назад">‹</button><div class="t" id="ct"></div><button class="nb" id="cnm" title="Месяц вперёд">›</button><button class="nb" id="cny" title="Год вперёд">»</button></div><div class="grid" id="cg"></div></div>'+
  '</div><div id="stage"><div id="main"><div id="view"></div></div><div id="stack"></div></div>';
@@ -1081,6 +1197,7 @@ function actsHtml(){
     '<button class="cam" id="tl" title="Назад" aria-label="Назад">'+ILEFT+'</button>'+
     '<button class="pill" id="cp">Скопировать</button>'+
     '<button class="cam" id="addph" title="Вклеить фото или чек" aria-label="Вклеить фото или чек">'+ICAM+'</button>'+
+    '<button class="cam fvb'+(curDay&&favDay(curDay.d)?" on":"")+'" id="favb" title="'+(curDay&&favDay(curDay.d)?"Убрать день из избранного (чтобы сохранить фразу, сначала выдели её)":"В избранное (чтобы сохранить фразу, сначала выдели её)")+'" aria-label="В избранное">'+ISTAR+'</button>'+
     '<button class="pill" id="ee">Изменить</button>'+
     '<button class="cam" id="tr" title="Дальше" aria-label="Дальше">'+IRIGHT+'</button></div>';
 }
@@ -1090,11 +1207,11 @@ function renderBar(){
   if(COPIED&&curDay&&COPIED===curDay.d&&$("cp"))$("cp").textContent="Скопировано";
   var go=function(id,f){var e=$(id);if(e)e.onclick=f};
   if(!S.edit&&curDay){if(!adj(curDay,-1))$("tl").disabled=true;if(!adj(curDay,1))$("tr").disabled=true}
-  if(!curDay){["tl","tr","cp","addph","ee"].forEach(function(id){var e=$(id);if(e)e.disabled=true});
+  if(!curDay){["tl","tr","cp","addph","ee","favb"].forEach(function(id){var e=$(id);if(e)e.disabled=true});
     var pk=dkey(S.y,S.m,S.d),pr=DAYS.filter(function(x){return x.d<pk}).pop(),nx=DAYS.filter(function(x){return x.d>pk})[0];
     if(pr){$("tl").disabled=false;go("tl",function(){openDay(pr.d)})}if(nx){$("tr").disabled=false;go("tr",function(){openDay(nx.d)})}}
   else{go("tl",function(){goDay(-1)});go("tr",function(){goDay(1)})}
-  go("back",function(){showResults()});go("cp",doCopy);go("ee",function(){S.edit=true;showDay(false)});go("addph",addPhoto);
+  go("back",function(){showResults()});go("cp",doCopy);go("ee",function(){S.edit=true;showDay(false)});go("addph",addPhoto);go("favb",favStar);if(!curDay&&$("favb"))$("favb").disabled=true;
   go("cn",function(){S.edit=false;showDay(false)});go("sv",doSave);go("dl",downloadCopy);
 }
 function headHtml(d){return '<div class="hd"><span class="mrg">'+esc(d.w)+'</span><h1>'+d.dd+" "+MONTHS[d.m-1]+" "+d.y+'</h1></div>'}
@@ -1167,15 +1284,15 @@ function figHtml(p,j,cw,ch,flow){
 }
 function bodyHtml(d,ph,cw,ch,flow){
   // фото вставляются на границах абзацев, равномерно по тексту
-  var t=d.t.replace(/\s+$/,""),n=ph.length,cuts=[],out="",last=0;
+  var t=d.t.replace(/\s+$/,""),n=ph.length,cuts=[],out="",last=0,FR=favRanges(d.d,t);
   // телефон: текст целиком, а фото крошечными полароидами внизу страницы; по нажатию открываются целиком
-  if(flow)return esc(t)+(n?'<div class="pstrip">'+ph.map(function(p,j){return '<figure class="pic mini'+(j%2?" l":"")+'" data-f="'+esc(p.key)+'"'+(p.full?' data-full="'+esc(p.full)+'"':"")+'>'+picInner(p.src,p.key)+'</figure>'}).join("")+'</div>':"");
+  if(flow)return escF(t,0,t.length,FR)+(n?'<div class="pstrip">'+ph.map(function(p,j){return '<figure class="pic mini'+(j%2?" l":"")+'" data-f="'+esc(p.key)+'"'+(p.full?' data-full="'+esc(p.full)+'"':"")+'>'+picInner(p.src,p.key)+'</figure>'}).join("")+'</div>':"");
   for(var j=0;j<n;j++){
     var at=j===0?0:Math.round(t.length*j/n),nl=t.indexOf("\n",at);
     cuts.push(j===0?0:(nl<0?t.length:nl+1));
   }
-  for(j=0;j<n;j++){out+=esc(t.slice(last,cuts[j]))+figHtml(ph[j],j,cw,ch,flow);last=cuts[j]}
-  return out+esc(t.slice(last));
+  for(j=0;j<n;j++){out+=escF(t,last,cuts[j],FR)+figHtml(ph[j],j,cw,ch,flow);last=cuts[j]}
+  return out+escF(t,last,t.length,FR);
 }
 
 function makeLeaf(d,ph,box,edit,custom,cls){
@@ -1697,12 +1814,14 @@ function resultsHtml(R){
   if(!R.res.length&&R.noPhrase){
     h+='<div class="empty">Такого сочетания слов нет.</div>';
     if(R.alt.length)h+='<button class="pill sm" id="altb" style="margin-top:6px">Показать дни, где эти слова встречаются по отдельности ('+R.alt.length+')</button>';
+  }else if(!R.res.length&&R.fav){
+    h+='<div class="empty">В избранном пока пусто. Нажми звёздочку внизу страницы дня. Чтобы сохранить фразу, сначала выдели её.</div>';
   }else if(!R.res.length){
     if(f.y&&f.m&&f.d&&!R.stems.length)h+='<div class="empty">В этот день записи нет.</div>';
     else h+='<div class="empty">'+(R.none?"Короткие и служебные слова не ищутся.":"Ничего не нашлось.")+'</div>';
   }else{
     R.res.slice(0,shown).forEach(function(r,i){
-      h+='<button class="res" data-i="'+i+'"><div class="dt">'+r.d.dd+" "+MONTHS[r.d.m-1]+" "+r.d.y+'</div><div class="snip">'+snippet(r,R.hls||R.stems)+'</div></button>';
+      h+='<button class="res" data-i="'+i+'"><div class="dt">'+r.d.dd+" "+MONTHS[r.d.m-1]+" "+r.d.y+(R.fav&&r.kind==="ph"?" · фраза":"")+'</div><div class="snip">'+(R.fav?favSnip(r):snippet(r,R.hls||R.stems))+'</div>'+(R.fav?'<span class="favx" role="button" tabindex="0" title="Убрать из избранного" aria-label="Убрать из избранного" data-k="'+r.k+'" data-pk="'+esc(r.pk)+'">✕</span>':'')+'</button>';
     });
     if(R.res.length>shown)h+='<div class="more" id="more" style="height:40px"></div>';
   }
@@ -1762,7 +1881,7 @@ function flySearch(){
 }
 function closeSearch(){
   // крестик: поиск очищается, папка уезжает обратно в стопку между других
-  var q=$("q");q.value="";$("qx").style.display="none";S.results=null;S.words=[];S.mode="day";
+  var q=$("q");q.value="";$("qx").style.display="none";S.results=null;S.words=[];S.mode="day";favTopState();
   if(RMO){RMO.disconnect();RMO=null}
   showNav(-1);
 }
@@ -1770,6 +1889,7 @@ function showResults(){
   hideNav();
   S.mode="res";leaveWrite();var R=S.results;
   if(!R)return;
+  favTopState();
   if(!G.mob){
     // компьютер: результаты на листе папки поиска; если она уже открыта, обновляется только лист
     if(searchOpen()){refreshSearchLeaf(false);return}
@@ -1781,6 +1901,8 @@ function showResults(){
   resultsHooks($("view"),$("main"));
 }
 document.addEventListener("click",function(e){
+  var fx=e.target.closest&&e.target.closest(".favx");
+  if(fx){e.stopPropagation();e.preventDefault();favRemove(fx.dataset.k,fx.dataset.pk);return}
   var b=e.target.closest&&e.target.closest(".res");
   if(b&&S.results){
     var r=S.results.res[+b.dataset.i],stems=S.results.stems;S.words=stems;
@@ -1794,6 +1916,7 @@ document.addEventListener("click",function(e){
 function runSearch(){
   var v=$("q").value.trim();
   $("qx").style.display=v?"block":"none";
+  if(!v&&S.results&&S.results.fav){S.results=null;S.words=[];favTopState()}
   if(!v){S.results=null;S.words=[];if(S.mode==="res"){if(!G.mob&&searchOpen()){flyOpen(dkey(S.y,S.m,S.d))}else openDay(dkey(S.y,S.m,S.d))}return}
   S.results=search($("q").value);shown=LIM;
   var f=S.results.f;
@@ -1805,6 +1928,7 @@ function runSearch(){
   showResults();$("main").scrollTop=0;
 }
 $("q").addEventListener("input",runSearch);
+$("favBtn").onclick=toggleFavView;
 $("q").addEventListener("keydown",function(e){if(e.key==="Enter"){this.blur()}});
 $("qx").onclick=function(){$("q").value="";runSearch()};
 
@@ -2359,35 +2483,43 @@ function openWizard(){
   };
 }
 /* копия записей читателя в файл и возврат из него (на случай замены папки или чистки браузера) */
-function exportBackup(){
-  idbKeys().then(function(keys){
+function backupObject(){
+  return idbKeys().then(function(keys){
     var ks=keys.filter(function(k){return typeof k==="string"&&k.indexOf("photos:")===0});
     return Promise.all(ks.map(function(k){return idbGet(k).then(function(arr){return Promise.all((arr||[]).map(function(it){return blobToUrl(it.blob).then(function(u){return {name:it.name,data:u}})}))}).then(function(a){return {date:k.slice(7),items:a}})}));
   }).then(function(ph){
-    var o={dnevniki_copy:1,schema:SCHEMA,made:new Date().toISOString(),edits:EDITS,newdays:NEWDAYS,photo_del:PDEL.filter(function(n){return isAdded(n)}),photos:ph};
+    return {dnevniki_copy:1,schema:SCHEMA,made:new Date().toISOString(),edits:EDITS,newdays:NEWDAYS,photo_del:PDEL.filter(function(n){return isAdded(n)}),fav:FAV,photos:ph};
+  });
+}
+function exportBackup(){
+  backupObject().then(function(o){
     var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:"application/json"}));
     a.download="Дневники-копия-записей-"+new Date().toISOString().slice(0,10)+".json";document.body.appendChild(a);a.click();a.remove();
     toast("Копия записей сохранена в файл",5000);
   }).catch(function(){toast("Не удалось сохранить копию")});
 }
+function restoreBackup(o){
+  // возврат из копии: записи сливаются с текущими по меткам времени, ничего не затирается
+  if(!o||!o.dnevniki_copy)return Promise.reject(new Error("это не копия записей"));
+  var n=0;
+  Object.keys(o.edits||{}).forEach(function(k){if(!EDITS[k]||(o.edits[k].mt||0)>(EDITS[k].mt||0)){EDITS[k]=o.edits[k];n++}});
+  Object.keys(o.newdays||{}).forEach(function(k){if(!NEWDAYS[k]||(o.newdays[k].mt||0)>(NEWDAYS[k].mt||0)){NEWDAYS[k]=o.newdays[k];n++}});
+  (o.photo_del||[]).forEach(function(x){if(PDEL.indexOf(x)<0)PDEL.push(x)});
+  if(o.fav){var mf=favMerge(FAV,o.fav);if(favSig(mf)!==favSig(FAV)){FAV=mf;n++}}
+  safeLS(function(){localStorage.setItem("dn_edits",JSON.stringify(EDITS));localStorage.setItem("dn_new",JSON.stringify(NEWDAYS));localStorage.setItem("dn_photo_del",JSON.stringify(PDEL));localStorage.setItem("dn_fav",JSON.stringify(FAV))});
+  var chain=Promise.resolve(),pn=0;
+  (o.photos||[]).forEach(function(g){chain=chain.then(function(){return userPhotos(g.date)}).then(function(arr){
+    var ch=false;g.items.forEach(function(it){if(!arr.some(function(x){return x.name===it.name})&&PDEL.indexOf(it.name)<0){arr.push({name:it.name,blob:urlToBlob(it.data)});ch=true;pn++}});
+    if(ch)return idbSet("photos:"+g.date,arr);
+  })});
+  return chain.then(function(){return {n:n,pn:pn}});
+}
 function importBackup(){
   var inp=document.createElement("input");inp.type="file";inp.accept=".json,application/json";
   inp.onchange=function(){
     var f=inp.files&&inp.files[0];if(!f)return;
-    f.text().then(function(t){
-      var o=JSON.parse(t);if(!o.dnevniki_copy)throw new Error("это не копия записей");
-      var n=0;
-      Object.keys(o.edits||{}).forEach(function(k){if(!EDITS[k]||(o.edits[k].mt||0)>(EDITS[k].mt||0)){EDITS[k]=o.edits[k];n++}});
-      Object.keys(o.newdays||{}).forEach(function(k){if(!NEWDAYS[k]||(o.newdays[k].mt||0)>(NEWDAYS[k].mt||0)){NEWDAYS[k]=o.newdays[k];n++}});
-      (o.photo_del||[]).forEach(function(x){if(PDEL.indexOf(x)<0)PDEL.push(x)});
-      safeLS(function(){localStorage.setItem("dn_edits",JSON.stringify(EDITS));localStorage.setItem("dn_new",JSON.stringify(NEWDAYS));localStorage.setItem("dn_photo_del",JSON.stringify(PDEL))});
-      var chain=Promise.resolve(),pn=0;
-      (o.photos||[]).forEach(function(g){chain=chain.then(function(){return userPhotos(g.date)}).then(function(arr){
-        var ch=false;g.items.forEach(function(it){if(!arr.some(function(x){return x.name===it.name})&&PDEL.indexOf(it.name)<0){arr.push({name:it.name,blob:urlToBlob(it.data)});ch=true;pn++}});
-        if(ch)return idbSet("photos:"+g.date,arr);
-      })});
-      return chain.then(function(){toast("Возвращено записей: "+n+", фото: "+pn+". Перезагружаю…",3000);setTimeout(function(){location.reload()},1500)});
-    }).catch(function(e){toast("Не удалось: "+(e&&e.message||e))});
+    f.text().then(function(t){return restoreBackup(JSON.parse(t))}).then(function(r){toast("Возвращено записей: "+r.n+", фото: "+r.pn+". Перезагружаю…",3000);setTimeout(function(){location.reload()},1500)})
+      .catch(function(e){toast("Не удалось: "+(e&&e.message||e))});
   };
   inp.click();
 }
@@ -2520,7 +2652,11 @@ function syRun(){
     rpd.forEach(function(n){if(PDEL.indexOf(n)<0){PDEL.push(n);delete PHC[n.slice(0,10)];changed++;safeLS(function(){localStorage.setItem("dn_photo_del",JSON.stringify(PDEL))});userPhotos(n.slice(0,10)).then(function(a){return idbSet("photos:"+n.slice(0,10),a.filter(function(x){return x.name!==n}))}).catch(function(){})}});
     lpd.forEach(function(n){if(rpd.indexOf(n)<0)up=true});
     var allpd=PDEL.filter(function(n){return isAdded(n)});
-    var enc=function(){var j=JSON.stringify({v:SCHEMA,days:days,pdel:allpd});return DNC.pw?DNC.enc(j,DNC.pw):Promise.resolve(j)};
+    // избранное: слияние по меткам времени
+    var rfav=remote&&remote.fav||{},mfav=favMerge(FAV,rfav),sl=favSig(FAV);
+    if(favSig(mfav)!==sl){FAV=mfav;saveFav();changed++}
+    if(favSig(mfav)!==favSig(rfav))up=true;
+    var enc=function(){var j=JSON.stringify({v:SCHEMA,days:days,pdel:allpd,fav:FAV});return DNC.pw?DNC.enc(j,DNC.pw):Promise.resolve(j)};
     var p=up?enc().then(function(d){return syPut(SY.url,SY.key,d)}):Promise.resolve();
     return p.then(function(){
       safeLS(function(){localStorage.setItem("dn_sync_t",String(Date.now()))});
