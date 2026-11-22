@@ -74,6 +74,12 @@ body.navmode .fold:not(.open):hover .hl{opacity:.11}
 body:not(.navmode):not(.flying) .fold:not(.rdr):hover .hl{opacity:.12}
 body.flying .fold,body.flying .fold *{pointer-events:none!important;transition-property:transform!important}
 .fold.away{opacity:0}
+.fold.sf{visibility:hidden}.fold.sf.sfon{visibility:visible}
+.ft.sx{display:flex;align-items:center;justify-content:center;color:var(--tc)}
+.ft.sx svg{position:absolute;left:calc(50% - var(--tabh,36px) * .25);top:calc(50% - var(--tabh,36px) * .25);width:calc(var(--tabh,36px) * .5);height:calc(var(--tabh,36px) * .5);opacity:.92}
+.pc.rpc{padding-right:30px}
+.folder.srch::before{content:""}
+.folder.srch::after{content:"";position:absolute;right:0;top:-36px;width:170px;height:37px;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round'><path d='M6 6l12 12M18 6L6 18'/></svg>") no-repeat center/17px;pointer-events:none}
 .fold.away *{pointer-events:none!important}
 .ft{position:absolute;top:0;text-align:center;color:var(--tc);font-family:var(--disp);font-weight:600;letter-spacing:.01em;pointer-events:none;white-space:nowrap;padding-left:12px}
 .fct{position:absolute;opacity:0;pointer-events:none;transition:opacity .25s ease}
@@ -502,7 +508,7 @@ var _nd=safeLS(function(){return JSON.parse(localStorage.getItem("dn_new")||"{}"
 if(!RAW[CURY]&&Object.keys(_nd).some(function(k){return k.slice(0,4)===CURY}))RAW[CURY]=[];
 var YEARS=Object.keys(RAW).sort();
 var $=function(id){return document.getElementById(id)};
-var BUILD="22.11.2026 14:16";
+var BUILD="22.11.2026 16:02";
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е")}
 function safeLS(f){try{return f()}catch(e){return null}}
@@ -669,6 +675,9 @@ function buildStack(){
       foldSvg(y,G.W,hh,G.th,G.tw)+tabLabel(y)+
       '<div class="fct" style="top:'+(G.th+G.pad)+'px;left:'+G.pad+'px;right:'+G.pad+'px"></div></div>';
   });
+  h+='<div class="fold sf" data-i="'+YEARS.length+'" style="--c:#555;--tc:#fff;--tabh:'+G.th+'px;z-index:'+(YEARS.length+1)+';width:'+G.W+'px;height:'+(G.mob?G.Hf:G.Hc)+'px">'+
+    foldSvg('поиск',G.W,G.mob?G.Hf:G.Hc,G.th,G.tw)+'<div class="ft sx" style="left:'+(G.W-G.tw)+'px;width:'+G.tw+'px;height:'+G.th+'px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>'+
+    '<div class="fct" style="top:'+(G.th+G.pad)+'px;left:'+G.pad+'px;right:'+G.pad+'px"></div></div>';
   st.innerHTML=h;
   placeFolds();void st.offsetWidth;st.classList.remove("still");
 }
@@ -709,7 +718,7 @@ function showNav(openIdx){
   if(FLYING)return;
   var rdf=$("rd"),k=openIdx!=null?openIdx:(rdf?+rdf.getAttribute("data-i"):YEARS.indexOf(String(S.y)));
   var rf=restoreFold(true);document.body.classList.add("navmode");document.body.classList.remove("rd");
-  NAV.open=-1;openYear(k,openIdx!=null?0:(curDay?S.m:0));
+  NAV.open=-1;if(k>=0&&k<YEARS.length)openYear(k,openIdx!=null?0:(curDay?S.m:0));else placeFolds();
   playReturn(rf);
   NAV.lock=true;NAV.lx=null;
 }
@@ -825,7 +834,7 @@ function restoreFold(anim,el){
   var tz=f.querySelector("path.tz");if(tz)tz.classList.remove("tz");
   f.insertAdjacentHTML("beforeend",'<div class="fct" style="top:'+(G.th+G.pad)+'px;left:'+G.pad+'px;right:'+G.pad+'px"></div>');
   if(!(anim&&rb&&rb.animate&&!REDUCE.matches)){
-    if(rb)rb.remove();setFoldH(f,foldH(i));f.classList.remove("rdr","ropen","fl");f.style.transition="";f.style.transform="";f.style.willChange="";return null;
+    if(rb)rb.remove();setFoldH(f,foldH(i));f.classList.remove("rdr","ropen","fl","sfon");f.style.transition="";f.style.transform="";f.style.willChange="";return null;
   }
   f.classList.add("fl");f._ret=1;return f;
 }
@@ -856,7 +865,7 @@ function playReturn(f){
   aF.finished.then(function(){
     // всё в одном шаге: лист и меню убираются, папка получает размеры и положение стопки, итог совпадает с последним кадром
     if(rb.parentNode)rb.remove();
-    if(!f.id){setFoldH(f,foldH(i));f.classList.remove("rdr","ropen")}
+    if(!f.id){setFoldH(f,foldH(i));f.classList.remove("rdr","ropen","sfon")}
     f.classList.remove("fl");f.style.filter="";if(fct)fct.style.visibility="";
     if(!f.id){f.style.transform="";f.style.transition="";f.style.willChange=""}
     flyOff();if(own)FLYING=false;
@@ -864,7 +873,7 @@ function playReturn(f){
 }
 function placeBar(){
   var b=$("dbar");if(!b){b=document.createElement("div");b.id="dbar";b.className="dk";$("stage").appendChild(b)}
-  b.style.left=G.RL+"px";b.style.width=(G.Hf-G.th)+"px";b.style.top=(G.RT+G.W+20)+"px";
+  b.style.left=G.RL+"px";b.style.width=(G.Hf-G.th)+"px";b.style.top=(G.RT+G.W+20)+"px";b.style.display="";
   return b;
 }
 // щелчок по чёрному полю вокруг открытого дневника равен щелчку по ярлычку: папка уходит в стопку, остальные раскрываются к центру
@@ -874,7 +883,7 @@ $("stage").addEventListener("click",function(e){
   showNav();
 });
 // ярлычок открытой папки возвращает к стопке
-$("stack").addEventListener("click",function(e){if(e.target.closest&&e.target.closest("#rd path.tz")){e.stopPropagation();showNav()}},true);
+$("stack").addEventListener("click",function(e){if(e.target.closest&&e.target.closest("#rd path.tz")){e.stopPropagation();if($("rd").classList.contains("sf"))closeSearch();else showNav()}},true);
 
 /* выбор дня: сама папка выезжает из своей ячейки стопки вправо с поворотом на 90 градусов, остальные синхронно уходят влево;
    меню месяцев съезжает вниз по папке, лист дня с уже готовым текстом выезжает на место меню и накрывает его */
@@ -1116,7 +1125,7 @@ function bodyHtml(d,ph,cw,ch,flow){
   return out+esc(t.slice(last));
 }
 
-function makeLeaf(d,ph,box,edit,custom){
+function makeLeaf(d,ph,box,edit,custom,cls){
   var el=document.createElement("div");
   el.className="leaf"+(box.flow?" flow":"");el.setAttribute("data-k",d?d.d:"");
   el.style.cssText=(box.flow?"":"width:"+box.w+"px;height:"+box.h+"px");
@@ -1132,7 +1141,7 @@ function makeLeaf(d,ph,box,edit,custom){
   else if(!d)inner='<div class="hd"><h1>'+S.d+" "+MONTHS[S.m-1]+" "+S.y+'</h1></div><div class="empty">В этот день записи нет.</div>';
   else if(edit)inner=headHtml(d)+'<textarea id="ed" spellcheck="false"></textarea>';
   else inner=headHtml(d)+'<div class="text">'+bodyHtml(d,ph||[],cw,ch,box.flow)+'</div>';
-  el.innerHTML='<div class="lin fr"><i class="sdw"></i><div class="paper"><div class="pc'+(custom?' wpc':'')+'"'+pcs+'>'+inner+'</div><i class="shd"></i><i class="dim"></i></div>'+holesHtml()+'</div>'+
+  el.innerHTML='<div class="lin fr"><i class="sdw"></i><div class="paper"><div class="pc'+(custom?(cls?' '+cls:' wpc'):'')+'"'+pcs+'>'+inner+'</div><i class="shd"></i><i class="dim"></i></div>'+holesHtml()+'</div>'+
     (box.flow?'':'<div class="lin bk"><i class="sdw"></i><div class="paper"><i class="shd"></i></div>'+holesHtml()+'</div>');
   if(!box.flow)fitHoles(el,box.h);
   return el;
@@ -1255,7 +1264,7 @@ function onResize(){
   if(S.mode==="day"&&!isNav()&&(curDay||S.edit||G.mob!==wasMob||document.body.classList.contains("rd"))){
     if(!G.mob){var rd=$("rd");if(rd)rd.remove()}
     showDay(false);
-  }
+  }else if(S.mode==="res"&&S.results){showResults()}
 }
 document.addEventListener("keydown",function(e){
   if(e.key==="Escape"){
@@ -1603,13 +1612,8 @@ function snippet(r,stems){
   return (a>0?"… ":"")+hl(part,stems.length?stems:null)+(b<t.length?" …":"");
 }
 var shown=LIM,RMO=null;
-function showResults(){
-  hideNav();
-  S.mode="res";leaveWrite();var R=S.results;
-  if(!R)return;
-  var f=R.f;
-  // точная дата без слов: открыть сразу
-  var h='<div class="sheet" style="padding-left:92px"><div class="body">';
+function resultsHtml(R){
+  var f=R.f,h="";
   if(R.loose&&R.res.length)h+='<div class="empty" style="font-size:21px;padding:0 0 12px">Такого сочетания слов нет. Показаны дни, где эти слова встречаются по отдельности.</div>';
   if(!R.res.length&&R.noPhrase){
     h+='<div class="empty">Такого сочетания слов нет.</div>';
@@ -1623,22 +1627,89 @@ function showResults(){
     });
     if(R.res.length>shown)h+='<div class="more" id="more" style="height:40px"></div>';
   }
-  h+='</div></div>';
-  $("view").innerHTML=wrapFolder(h,S.y);
-  [].forEach.call(document.querySelectorAll("#view .sw"),function(e){fitHoles(e)});
-  var ab=$("altb");if(ab)ab.onclick=function(){R.res=R.alt;R.noPhrase=false;R.loose=true;shown=LIM;showResults()};
+  return h;
+}
+function searchFold(){return $("stack").querySelector(".fold.sf")}
+function searchOpen(){var sf=searchFold();return !!sf&&$("rd")===sf}
+function resultsHooks(root,scrollRoot){
+  var R=S.results,ab=$("altb");
+  if(ab)ab.onclick=function(){R.res=R.alt;R.noPhrase=false;R.loose=true;shown=LIM;showResults()};
   var mb=$("more");
   if(RMO){RMO.disconnect();RMO=null}
-  if(mb&&window.IntersectionObserver){RMO=new IntersectionObserver(function(en){if(en[0].isIntersecting){RMO.disconnect();RMO=null;shown+=LIM;var y=$("main").scrollTop;showResults();$("main").scrollTop=y}},{root:$("main"),rootMargin:"900px"});RMO.observe(mb)}
+  if(mb&&window.IntersectionObserver){RMO=new IntersectionObserver(function(en){if(en[0].isIntersecting){RMO.disconnect();RMO=null;shown+=LIM;var y=scrollRoot.scrollTop;if(searchOpen()){refreshSearchLeaf(true)}else showResults();scrollRoot.scrollTop=y}},{root:scrollRoot,rootMargin:"900px"});RMO.observe(mb)}
 }
-$("view").addEventListener("click",function(e){
-  var b=e.target.closest(".res");
-  if(b&&S.results){var r=S.results.res[+b.dataset.i];S.words=S.results.stems;openDay(r.d.d,S.results.stems)}
+function refreshSearchLeaf(keep){
+  var pc=$("rd").querySelector(".leaf.cur .pc");if(!pc)return;
+  var y=pc.scrollTop;pc.innerHTML=resultsHtml(S.results);pc.scrollTop=keep?y:0;resultsHooks(pc,pc);
+}
+/* папка поиска: вылетает из стопки с той же анимацией, что папка года, на язычке крестик; нажатие на язычок убирает её обратно в стопку */
+function flySearch(){
+  var f=searchFold();if(!f||FLYING||REDUCE.matches)return false;
+  var prev=$("rd");if(prev&&prev!==f)prev.id="";
+  var c=pal(S.y);f.style.setProperty("--c",c[0]);f.style.setProperty("--tc",c[1]);f.style.setProperty("--tabh",G.th+"px");
+  f.classList.add("sfon");
+  FLYING=true;
+  var sr=$("stack").getBoundingClientRect(),fr=f.getBoundingClientRect(),ty=Math.round(fr.top-sr.top);
+  var m=toReader(f,false),up=f.querySelector(".up");
+  f.classList.add("sf");
+  var lf=makeLeaf(null,null,leafBox(),null,resultsHtml(S.results),"rpc");lf.classList.add("cur");up.appendChild(lf);
+  var bar=$("dbar");if(bar)bar.style.display="none";
+  var D0=Math.round((G.Hf-G.th)*0.4);lf.style.transform="translateX("+(-D0)+"px)";lf.style.willChange="transform";f.classList.add("fl");f._d0=D0;
+  var start="translate(0px,"+ty+"px) rotate(0deg)",end=readerPose();
+  f.style.transition="none";f.style.transform=start;f.style.willChange="transform";if(blurOK())f.style.filter="blur(0.01px)";
+  requestAnimationFrame(function(){requestAnimationFrame(function(){
+    var D=FLYD*(window.__flySlow||1),E=FLYE,root=document.documentElement;
+    root.style.setProperty("--fd",D+"ms");root.style.setProperty("--fe",E);
+    flyOn();if(prev&&prev!==f)playReturn(restoreFold(true,prev));
+    var aF=f.animate([{transform:start},{transform:end}],{duration:D,easing:E});motionBlur(f,D);
+    f.style.transform=end;
+    document.body.classList.add("rd");hideNav();
+    var aL=lf.animate([{transform:"translateX("+(-D0)+"px)"},{transform:"none"}],{duration:D,easing:E,fill:"forwards"});
+    var pc=lf.querySelector(".pc"),aP=pc?pc.animate([{opacity:0},{opacity:1}],{duration:D*0.45,delay:D*0.3,easing:"ease-out",fill:"both"}):null;
+    aF.finished.then(function(){
+      lf.style.transform="";aL.cancel();if(aP)aP.cancel();
+      f.classList.remove("fl");f.classList.add("ropen");f.style.zIndex=200;f.style.filter="";
+      flyOff();FLYING=false;
+      resultsHooks(lf,lf.querySelector(".pc"));
+    });
+  })});
+  return true;
+}
+function closeSearch(){
+  // крестик: поиск очищается, папка уезжает обратно в стопку между других
+  var q=$("q");q.value="";$("qx").style.display="none";S.results=null;S.words=[];S.mode="day";
+  if(RMO){RMO.disconnect();RMO=null}
+  showNav(-1);
+}
+function showResults(){
+  hideNav();
+  S.mode="res";leaveWrite();var R=S.results;
+  if(!R)return;
+  if(!G.mob){
+    // компьютер: результаты на листе папки поиска; если она уже открыта, обновляется только лист
+    if(searchOpen()){refreshSearchLeaf(false);return}
+    if(flySearch())return;
+  }
+  var h='<div class="sheet" style="padding-left:92px"><div class="body">'+resultsHtml(R)+'</div></div>';
+  $("view").innerHTML=wrapFolder(h,S.y).replace('<div class="folder"','<div class="folder srch"').replace(/data-y="[^"]*"/,'data-y=""');
+  [].forEach.call(document.querySelectorAll("#view .sw"),function(e){fitHoles(e)});
+  resultsHooks($("view"),$("main"));
+}
+document.addEventListener("click",function(e){
+  var b=e.target.closest&&e.target.closest(".res");
+  if(b&&S.results){
+    var r=S.results.res[+b.dataset.i],stems=S.results.stems;S.words=stems;
+    if(!G.mob&&searchOpen()){flyOpen(r.d.d);fromResults=true;S.words=stems;return}
+    openDay(r.d.d,stems);return;
+  }
+  // телефон: язычок папки результатов (крестик) закрывает поиск
+  var fo=e.target.closest&&e.target.closest("#view .folder.srch");
+  if(G.mob&&(e.target.id==="view"||fo)){var box=fo&&fo.getBoundingClientRect();if(box&&e.clientY<box.top&&e.clientX>box.right-170){var q=$("q");q.value="";runSearch()}}
 });
 function runSearch(){
   var v=$("q").value.trim();
   $("qx").style.display=v?"block":"none";
-  if(!v){S.results=null;S.words=[];if(S.mode==="res"){openDay(dkey(S.y,S.m,S.d))}return}
+  if(!v){S.results=null;S.words=[];if(S.mode==="res"){if(!G.mob&&searchOpen()){flyOpen(dkey(S.y,S.m,S.d))}else openDay(dkey(S.y,S.m,S.d))}return}
   S.results=search(v);shown=LIM;
   var f=S.results.f;
   // в запросе только короткие или служебные слова: ничего не ищем
