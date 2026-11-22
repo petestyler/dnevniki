@@ -35,6 +35,7 @@
   --read:"PT Serif",Georgia,"Times New Roman",serif;
   --ui:"Manrope",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
   --mono:"IBM Plex Mono","Courier New",monospace;
+  --sp:linear(0, 0.085, 0.269, 0.476, 0.662, 0.81, 0.915, 0.982, 1.019, 1.035, 1.038, 1.034, 1.026, 1.019, 1.012, 1.006, 1.003, 1, 0.999, 0.999, 0.999, 0.999, 0.999, 0.999, 1, 1, 1, 1, 1, 1, 1);
   --btn:#1a1a1a;--btnh:#232323;
   --bsh:none;--bsa:none;
   --fc:#2f55d4;--tc:#fff;--P:clamp(34px,3.6vw,56px);
@@ -267,6 +268,26 @@ body:not(.rd) #dbar{opacity:0;pointer-events:none}
 .kmenu svg{width:22px;height:22px}
 .kmenu .ki{font:600 19px var(--ui);width:22px;text-align:center}
 
+/* ---------- нажатие и появление пружиной (как в Record: демпфирование .72, жёсткость 500) ---------- */
+.wbtn,.ib,.pill,.cam,.nb,.mx,.mt,.dy,.hok,.hno,.vopt,.grid button,#lock button,.pdel{transition:transform .6s var(--sp),background .2s,color .2s,box-shadow .2s,opacity .2s}
+.wbtn:active,.ib:active,.pill:active,.cam:active,.nb:active,.mx:active,.mt:active,.dy:active,.hok:active,.hno:active,.vopt:active,.grid button:active,#lock button:active,.pdel:active{transform:scale(.95)!important;transition-duration:.08s,.2s,.2s,.2s,.2s;transition-timing-function:ease-out}
+.mt:active,.dy:active{transform:scale(.9)!important}
+@keyframes spIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
+@keyframes spInY{from{opacity:0;transform:translateY(10px) scale(.94)}to{opacity:1;transform:none}}
+.mcard{animation:spInY .6s var(--sp)!important}
+.calpop{animation:spIn .6s var(--sp)!important;transform-origin:top right}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px) scale(.94)}to{opacity:1;transform:translateX(-50%)}}
+#toast.pop{animation:toastIn .55s var(--sp)}
+/* ---------- мягкие края списков ---------- */
+.sedge{position:absolute;left:var(--strip);right:0;height:30px;pointer-events:none;z-index:6;opacity:0;transition:opacity .25s ease}
+.sedge.t{top:0;background:linear-gradient(var(--bg),rgba(5,5,5,0))}
+.sedge.b{bottom:0;background:linear-gradient(rgba(5,5,5,0),var(--bg))}
+.sedge.on{opacity:1}
+.pc.fe-t{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 26px);mask-image:linear-gradient(to bottom,transparent 0,#000 26px)}
+.pc.fe-b{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 26px),transparent 100%);mask-image:linear-gradient(to bottom,#000 calc(100% - 26px),transparent 100%)}
+.pc.fe-t.fe-b{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 26px,#000 calc(100% - 26px),transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 26px,#000 calc(100% - 26px),transparent 100%)}
+@media(prefers-reduced-motion:reduce){.wbtn,.ib,.pill,.cam,.nb,.mx,.mt,.dy,.hok,.hno,.vopt,.grid button,#lock button,.pdel{transition:background .2s,color .2s}.mcard,.calpop{animation:none!important}}
+
 /* ---------- вход по паролю ---------- */
 #lock{position:fixed;inset:0;z-index:500;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
 #lock .lk{width:min(380px,100%);background:#121212;border:1px solid #2a2a2a;border-radius:22px;padding:30px 28px 24px;color:#efe8d6;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.7)}
@@ -481,7 +502,7 @@ var _nd=safeLS(function(){return JSON.parse(localStorage.getItem("dn_new")||"{}"
 if(!RAW[CURY]&&Object.keys(_nd).some(function(k){return k.slice(0,4)===CURY}))RAW[CURY]=[];
 var YEARS=Object.keys(RAW).sort();
 var $=function(id){return document.getElementById(id)};
-var BUILD="22.11.2026 13:33";
+var BUILD="22.11.2026 14:16";
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е")}
 function safeLS(f){try{return f()}catch(e){return null}}
@@ -755,10 +776,22 @@ var FLYD=760,FLYE="cubic-bezier(.42,.02,.18,1)";
 /* размытие в движении: один фильтр на летящей папке, только в быстрой фазе; выключено при уменьшенной анимации и на слабых устройствах */
 var LOWP=(navigator.hardwareConcurrency||8)<=4||(navigator.deviceMemory||8)<=2;
 function blurOK(){return !LOWP&&!safeLS(function(){return localStorage.getItem("dn_noblur")})&&!window.matchMedia("(prefers-reduced-motion: reduce)").matches}
-function motionBlur(el,D){if(!blurOK()||!el.animate)return;
-  // самопроверка: если на этом устройстве в полёте много просевших кадров, размытие отключается насовсем
-  var t0=performance.now(),last=t0,slow=0;(function pr(t){if(t-last>42)slow++;last=t;if(t-t0<D+60)requestAnimationFrame(pr);else if(slow>=3)safeLS(function(){localStorage.setItem("dn_noblur","1")})})(t0);
-  el.animate([{filter:"blur(0px)",offset:0},{filter:"blur(2.8px)",offset:.3},{filter:"blur(1px)",offset:.55},{filter:"blur(0px)",offset:.8},{filter:"blur(0px)",offset:1}],{duration:D,easing:"linear"})}   // мягкий разгон и мягкая остановка; те же значения у стопки в CSS (--fd, --fe)
+function blurLevel(v){
+  // как в Record: ниже порога размытия нет, выше растёт гладко (smoothstep), уровни по 0,5 px, максимум 3 px; в покое нагрузки нет
+  var f=Math.max(0,Math.min(1,(v-700)/(3200-700)));return Math.round(f*f*(3-2*f)*6);
+}
+function motionBlur(el,D){
+  if(!blurOK())return;
+  // один проход на кадр: скорость папки по смещению, уровень меняется только когда меняется ступень
+  var t0=performance.now(),last=t0,slow=0,px=null,py=null,lv=-1;
+  (function pr(t){
+    var r=el.getBoundingClientRect(),x=r.left,y=r.top;
+    if(px!==null&&t>last){var l=blurLevel(Math.hypot(x-px,y-py)/((t-last)/1000));if(l!==lv){lv=l;el.style.filter=l?"blur("+(l*.5)+"px)":"blur(0.01px)"}}
+    px=x;py=y;if(t-last>42)slow++;last=t;
+    if(t-t0<D+60)requestAnimationFrame(pr);
+    else{if(slow>=3)safeLS(function(){localStorage.setItem("dn_noblur","1")})}   // на этом устройстве просели кадры: размытие отключается насовсем
+  })(t0);
+}
 function stackOff(){return -(G.left+G.W-G.col)}          // сдвиг стопки в режиме чтения
 function readerPose(){
   // поза папки в координатах стопки: на экране место чтения, минус сдвиг самой стопки
@@ -814,7 +847,7 @@ function playReturn(f){
   var mn=null,my="translateY("+Math.round(D0*1.3+40)+"px)";
   if(menuHtml&&fct)fct.style.visibility="hidden";   // настоящее меню папки скрыто, пока едет его точная копия под листом
   if(menuHtml){rb.insertAdjacentHTML("afterbegin",'<div class="rmenu" style="top:'+G.pad+'px;left:'+G.pad+'px;right:'+G.pad+'px;transform:'+my+'">'+menuHtml+'</div>');mn=rb.querySelector(".rmenu")}
-  f.style.transition="none";f.style.willChange="transform";f.style.transform=end;
+  f.style.transition="none";f.style.willChange="transform";f.style.transform=end;if(blurOK())f.style.filter="blur(0.01px)";
   var aF=f.animate([{transform:start},{transform:end}],{duration:D,easing:E});motionBlur(f,D);
   var pc=lf&&lf.querySelector(".pc"),all=[];
   // бумага уезжает целиком вдоль папки и скрывается за соседними папками, без исчезновения; текст остаётся на ней
@@ -824,7 +857,7 @@ function playReturn(f){
     // всё в одном шаге: лист и меню убираются, папка получает размеры и положение стопки, итог совпадает с последним кадром
     if(rb.parentNode)rb.remove();
     if(!f.id){setFoldH(f,foldH(i));f.classList.remove("rdr","ropen")}
-    f.classList.remove("fl");if(fct)fct.style.visibility="";
+    f.classList.remove("fl");f.style.filter="";if(fct)fct.style.visibility="";
     if(!f.id){f.style.transform="";f.style.transition="";f.style.willChange=""}
     flyOff();if(own)FLYING=false;
   },function(){flyOff();if(own)FLYING=false});
@@ -1346,7 +1379,8 @@ function addPhoto(){var d=curDay,b=$("addph");askKind(b,function(kind){addPhotoF
   delete PHC[d.d];if(curDay===d&&!S.edit)showDay(false)},kind)})}
 
 var tt=null;
-function toast(msg,ms){var t=$("toast");t.textContent=msg;t.style.display="block";clearTimeout(tt);tt=setTimeout(function(){t.style.display="none"},ms||2500)}
+function toastPop(){var t=$("toast");if(!t)return;t.classList.remove("pop");void t.offsetWidth;t.classList.add("pop")}
+function toast(msg,ms){var t=$("toast");t.textContent=msg;t.style.display="block";toastPop();clearTimeout(tt);tt=setTimeout(function(){t.style.display="none"},ms||2500)}
 function doCopyText(text){
   var ok=function(){toast("Код скопирован: перешли его вместе со ссылкой",5000)};
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(ok,function(){window.prompt("Скопируй код:",text)});else window.prompt("Скопируй код:",text);
@@ -2434,6 +2468,24 @@ function showHints(){
   ov.appendChild(no);
 }
 setTimeout(function(){if(isNav()&&!$("lock"))showHints()},1400);
+
+/* мягкие края списков: затухание у верхней и нижней границы, когда есть что прокручивать */
+(function(){
+  var main=$("main"),stage=$("stage");if(!main||!stage)return;
+  var t=document.createElement("div"),b=document.createElement("div");t.className="sedge t";b.className="sedge b";stage.appendChild(t);stage.appendChild(b);
+  function upd(){
+    var m=main.scrollHeight-main.clientHeight,off=document.body.classList.contains("rd")||document.body.classList.contains("navmode");
+    t.classList.toggle("on",!off&&main.scrollTop>6);b.classList.toggle("on",!off&&m>8&&main.scrollTop<m-6);
+  }
+  main.addEventListener("scroll",upd,{passive:true});addEventListener("resize",upd);
+  if(window.ResizeObserver)new ResizeObserver(upd).observe($("view"));
+  if(window.MutationObserver)new MutationObserver(upd).observe(document.body,{attributes:true,attributeFilter:["class"]});
+  // текст внутри листа в режиме чтения: то же затухание у краёв
+  document.addEventListener("scroll",function(e){var p=e.target;if(!p||!p.classList||!p.classList.contains("pc"))return;
+    var m=p.scrollHeight-p.clientHeight;p.classList.toggle("fe-t",p.scrollTop>6);p.classList.toggle("fe-b",m>8&&p.scrollTop<m-6)},true);
+  setInterval(function(){var p=document.querySelector(".leaf.cur .pc");if(!p)return;var m=p.scrollHeight-p.clientHeight;if(m>8&&!p.classList.contains("fe-t")&&!p.classList.contains("fe-b")&&p.scrollTop<m-6)p.classList.add("fe-b")},600);
+  upd();
+})();
 
 /* при запуске: предложить восстановить черновик */
 idbGet("draft").then(function(dr){
