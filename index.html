@@ -76,7 +76,7 @@ body.flying .fold,body.flying .fold *{pointer-events:none!important;transition-p
 .fold.away{opacity:0}
 .fold.sf{visibility:hidden}.fold.sf.sfon{visibility:visible}
 .ft.sx{display:flex;align-items:center;justify-content:center;color:var(--tc)}
-.ft.sx svg{position:absolute;left:calc(50% - var(--tabh,36px) * .25);top:calc(50% - var(--tabh,36px) * .25);width:calc(var(--tabh,36px) * .5);height:calc(var(--tabh,36px) * .5);opacity:.92}
+.ft.sx svg{position:absolute;left:calc(50% + var(--tabs,0px) / 2 - var(--tabh,36px) * .25);top:calc(50% + .75px - var(--tabh,36px) * .25);width:calc(var(--tabh,36px) * .5);height:calc(var(--tabh,36px) * .5);opacity:.92}
 .pc.rpc{padding-right:30px}
 .folder.srch::before{content:""}
 .folder.srch::after{content:"";position:absolute;right:0;top:-36px;width:170px;height:37px;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round'><path d='M6 6l12 12M18 6L6 18'/></svg>") no-repeat center/17px;pointer-events:none}
@@ -509,7 +509,7 @@ var _nd=safeLS(function(){return JSON.parse(localStorage.getItem("dn_new")||"{}"
 if(!RAW[CURY]&&Object.keys(_nd).some(function(k){return k.slice(0,4)===CURY}))RAW[CURY]=[];
 var YEARS=Object.keys(RAW).sort();
 var $=function(id){return document.getElementById(id)};
-var BUILD="22.11.2026 16:48";
+var BUILD="22.11.2026 19:17";
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е")}
 function safeLS(f){try{return f()}catch(e){return null}}
@@ -699,23 +699,26 @@ function buildStack(){
   G.Hc=Math.min(G.Hf,2*G.th+G.R+10);        // в стопке видна только верхняя полоса папки и место под меню: слой папки небольшой
   YEARS.forEach(function(y,i){
     var c=pal(y),hh=foldH(i);
-    h+='<div class="fold" data-i="'+i+'" style="--c:'+c[0]+';--tc:'+c[1]+';z-index:'+(i+1)+';width:'+G.W+'px;height:'+hh+'px">'+
+    h+='<div class="fold" data-i="'+i+'" style="--c:'+c[0]+';--tc:'+c[1]+';z-index:'+(2*(i+1))+';width:'+G.W+'px;height:'+hh+'px">'+
       foldSvg(y,G.W,hh,G.th,G.tw)+tabLabel(y)+
       '<div class="fct" style="top:'+(G.th+G.pad)+'px;left:'+G.pad+'px;right:'+G.pad+'px"></div></div>';
   });
-  h+='<div class="fold sf" data-i="'+YEARS.length+'" style="--c:#555;--tc:#fff;--tabh:'+G.th+'px;z-index:'+(YEARS.length+1)+';width:'+G.W+'px;height:'+(G.mob?G.Hf:G.Hc)+'px">'+
+  h+='<div class="fold sf" data-i="'+YEARS.length+'" style="--c:#555;--tc:#fff;--tabh:'+G.th+'px;--tabs:'+Math.min(24,G.tw*0.16)+'px;z-index:1;width:'+G.W+'px;height:'+(G.mob?G.Hf:G.Hc)+'px">'+
     foldSvg('поиск',G.W,G.mob?G.Hf:G.Hc,G.th,G.tw)+'<div class="ft sx" style="left:'+(G.W-G.tw)+'px;width:'+G.tw+'px;height:'+G.th+'px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>'+
     '<div class="fct" style="top:'+(G.th+G.pad)+'px;left:'+G.pad+'px;right:'+G.pad+'px"></div></div>';
   st.innerHTML=h;
   placeFolds();void st.offsetWidth;st.classList.remove("still");
 }
+var SFI=0;   // место папки поиска в стопке: случайное при каждом открытии
 function placeFolds(){
   var k=NAV.open,nav=document.body.classList.contains("navmode");
   var shift=nav&&k>=0?G.pad+G.rm+(NAV.month?G.rd:0)+G.pad:0,last=0;
-  var rdf=!nav?$("rd"):null,rIdx=rdf?+rdf.getAttribute("data-i"):-1;   // пока папка вынута, пустое место в стопке схлопывается до обычного шага
+  var rdf=!nav?$("rd"):null,rIdx=rdf&&!rdf.classList.contains("sf")?+rdf.getAttribute("data-i"):-1;   // пока папка вынута, пустое место в стопке схлопывается до обычного шага (папка поиска места в стопке не занимает)
   [].forEach.call($("stack").querySelectorAll(".fold"),function(f,i){
-    var y=baseY(i)+(i>k&&k>=0?shift:0)-(rIdx>=0&&i>rIdx?G.rs:0);last=y;
+    var sf=f.classList.contains("sf"),j=sf?SFI:i;   // папка поиска стоит ровно за папкой SFI и скрыта ею
+    var y=baseY(j)+(j>k&&k>=0?shift:0)-(rIdx>=0&&j>rIdx?G.rs:0);if(!sf)last=y;
     f.style.setProperty("--y",y+"px");
+    if(sf)return;
     f.classList.toggle("open",nav&&i===k);f.classList.toggle("mon",nav&&i===k&&NAV.month);
   });
   var sp=$("stack").querySelector(".sp");if(sp)sp.style.height=(last+G.th+G.R+60)+"px";
@@ -858,7 +861,7 @@ function restoreFold(anim,el){
   // а движение играет playReturn (тот же полёт назад: папка, лист и меню едут вместе, размеры не меняются)
   var f=el||$("rd");if(!f)return null;
   var rb=f.querySelector(".rbody"),i=+f.getAttribute("data-i");
-  f.id="";f.removeAttribute("data-y");f.style.zIndex=(i+1);
+  f.id="";f.removeAttribute("data-y");f.style.zIndex=f.classList.contains("sf")?(2*SFI+1):(2*(i+1));
   var tz=f.querySelector("path.tz");if(tz)tz.classList.remove("tz");
   f.insertAdjacentHTML("beforeend",'<div class="fct" style="top:'+(G.th+G.pad)+'px;left:'+G.pad+'px;right:'+G.pad+'px"></div>');
   if(!(anim&&rb&&rb.animate&&!REDUCE.matches)){
@@ -866,6 +869,27 @@ function restoreFold(anim,el){
   }
   f.classList.add("fl");f._ret=1;return f;
 }
+function cleanFold(f){
+  var i=+f.getAttribute("data-i"),sf=f.classList.contains("sf");
+  [].forEach.call(f.querySelectorAll(".rbody"),function(e){e.remove()});
+  var tz=f.querySelector("path.tz");if(tz)tz.classList.remove("tz");
+  ["rdr","ropen","fl","open","mon"].forEach(function(c){f.classList.remove(c)});if(sf)f.classList.remove("sfon");
+  f.removeAttribute("data-y");f.style.transition="";f.style.transform="";f.style.willChange="";f.style.filter="";
+  f.style.zIndex=sf?(2*SFI+1):(2*(i+1));
+  if(!f.querySelector(".fct"))f.insertAdjacentHTML("beforeend",'<div class="fct" style="top:'+(G.th+G.pad)+'px;left:'+G.pad+'px;right:'+G.pad+'px"></div>');
+  setFoldH(f,sf?(G.mob?G.Hf:G.Hc):foldH(i));
+}
+function sweepFolds(){
+  // в покое в стопке не бывает папок с ярлыками полёта или чтения, кроме #rd: если такая осталась после гонки анимаций, она убирается
+  if(window.__noSweep||FLYING||FLYN||S.edit)return;
+  var rd=$("rd");
+  [].forEach.call($("stack").querySelectorAll(".fold"),function(f){
+    if(f===rd||(f.getAnimations&&f.getAnimations().length))return;
+    var stray=f.querySelector(".rbody")||f.classList.contains("rdr")||f.classList.contains("ropen")||f.classList.contains("fl")||f.style.transform||f.style.zIndex==="200"||(f.classList.contains("sf")&&f.classList.contains("sfon"));
+    if(stray){cleanFold(f);placeFolds()}
+  });
+}
+setInterval(sweepFolds,700);
 function flyOn(){FLYN++;document.body.classList.add("flying")}
 function flyOff(){FLYN=Math.max(0,FLYN-1);if(!FLYN){document.body.classList.remove("flying");var r=document.documentElement;r.style.removeProperty("--fd");r.style.removeProperty("--fe")}}
 var FLYN=0;
@@ -956,7 +980,8 @@ function flyOpen(key){
       aF.finished.then(function(){
         // итоговый стиль и снятие анимаций в одном шаге: после остановки ничего не двигается и не перекладывается
         lf.style.transform="";aL.cancel();if(aP)aP.cancel();if(mn)mn.remove();
-        fold.classList.remove("fl");fold.classList.add("ropen");fold.style.zIndex=200;fold.style.filter="";
+        fold.classList.remove("fl");fold.style.filter="";
+        if(fold.id==="rd"){fold.classList.add("ropen");fold.style.zIndex=200}   // если за время полёта папку уже сменила другая, она возвращается в стопку своим ходом
         flyOff();FLYING=false;
         setTimeout(prepNeighbors,500);
       });
@@ -1700,7 +1725,12 @@ function refreshSearchLeaf(keep){
 function flySearch(){
   var f=searchFold();if(!f||FLYING||REDUCE.matches)return false;
   var prev=$("rd");if(prev&&prev!==f)prev.id="";
-  var c=pal(S.y);f.style.setProperty("--c",c[0]);f.style.setProperty("--tc",c[1]);f.style.setProperty("--tabh",G.th+"px");
+  // случайное место в стопке и случайный цвет одного из годов (не цвет только что открытой папки)
+  SFI=Math.floor(Math.random()*YEARS.length);
+  var pc0=prev&&prev!==f?prev.style.getPropertyValue("--c"):"",c=pal(YEARS[SFI]),tries=0;
+  while(tries++<12){var cc=pal(YEARS[Math.floor(Math.random()*YEARS.length)]);if(cc[0]!==pc0){c=cc;break}}
+  f.style.setProperty("--c",c[0]);f.style.setProperty("--tc",c[1]);f.style.setProperty("--tabh",G.th+"px");f.style.zIndex=2*SFI+1;
+  var stk=$("stack");stk.classList.add("still");placeFolds();void stk.offsetWidth;stk.classList.remove("still");
   f.classList.add("sfon");
   FLYING=true;
   var sr=$("stack").getBoundingClientRect(),fr=f.getBoundingClientRect(),ty=Math.round(fr.top-sr.top);
@@ -1722,7 +1752,8 @@ function flySearch(){
     var pc=lf.querySelector(".pc"),aP=pc?pc.animate([{opacity:0},{opacity:1}],{duration:D*0.45,delay:D*0.3,easing:"ease-out",fill:"both"}):null;
     aF.finished.then(function(){
       lf.style.transform="";aL.cancel();if(aP)aP.cancel();
-      f.classList.remove("fl");f.classList.add("ropen");f.style.zIndex=200;f.style.filter="";
+      f.classList.remove("fl");f.style.filter="";
+      if(f.id==="rd"){f.classList.add("ropen");f.style.zIndex=200}
       flyOff();FLYING=false;
       resultsHooks(lf,lf.querySelector(".pc"));
     });
@@ -2305,7 +2336,7 @@ function openWizard(){
     step(3,["Разверни скрипт","Справа вверху нажми «Начать развёртывание», затем «Новое развёртывание». Нажми шестерёнку рядом с «Выберите тип» и выбери «Веб-приложение». В строке «У кого есть доступ» выбери «Все». Нажми «Развернуть»."])+
     step(4,["Разреши доступ","Google попросит разрешение: нажми «Предоставить доступ» и выбери свой аккаунт. Если напишет «Google не проверил это приложение», нажми «Дополнительные», потом «Перейти на страницу (небезопасно)» и «Разрешить». Это твой собственный скрипт, он видит только твой Диск."])+
     step(5,["Вставь сюда адрес","Скопируй «URL веб-приложения» (он начинается с https://script.google.com/macros/s/) и вставь в строку ниже.",'<input class="fld" id="wzu" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="pill sm" id="wzgo">Подключить</button>'])+
-    '</ol><div class="pst" id="wzst"></div><div id="wzdone" hidden><p class="mt2">Диск подключён. Чтобы подключить телефон, нажми кнопку и отправь себе ссылку, а на телефоне открой её.</p><div class="acts"><button class="pill sm" id="wzlink">Скопировать ссылку для телефона</button></div></div></div>';
+    '</ol><div class="pst" id="wzst"></div><div id="wzdone" hidden><p class="mt2">Диск подключён. Чтобы подключить телефон: сначала добавь сайт на экран «Домой», потом нажми «Скопировать код для телефона», отправь код себе (в заметку или сообщение), открой значок «Дневники» на телефоне и вставь код.</p><div class="acts"><button class="pill sm" id="wzcode">Скопировать код для телефона</button><button class="pill sm" id="wzlink">Скопировать ссылку</button></div></div></div>';
   $("mx").onclick=function(){m.hidden=true};
   $("wz2").onclick=function(){copyText(code,"Код скопирован. Теперь вставь его в окно скрипта")};
   var st=function(t){$("wzst").textContent=t};
@@ -2320,7 +2351,9 @@ function openWizard(){
       return syRun().then(function(r){return pushAll().then(function(){return r})}).then(function(r){
         st("Готово! С твоего Диска получено записей: "+r.changed+(r.ph?", фото отправлено: "+r.ph.up:"")+". Дальше всё сохраняется само.");
         $("wzdone").hidden=false;
-        $("wzlink").onclick=function(){var c=btoa(unescape(encodeURIComponent(JSON.stringify({u:SY.url,k:SY.key}))));copyText(SITE_URL+"#c="+c,"Ссылка скопирована. Отправь её себе и открой на телефоне")};
+        var cod=function(){return btoa(unescape(encodeURIComponent(JSON.stringify({u:SY.url,k:SY.key}))))};
+        $("wzcode").onclick=function(){copyText(cod(),"Код скопирован. Отправь его себе и вставь в «Дневники» на телефоне")};
+        $("wzlink").onclick=function(){copyText(SITE_URL+"#c="+cod(),"Ссылка скопирована")};
       });
     }).catch(function(e){$("wzgo").disabled=false;st("Не получилось: "+(e&&e.message?e.message:"нет связи со скриптом. Проверь, что в шаге 3 выбрано «У кого есть доступ: Все»"))});
   };
@@ -2804,7 +2837,8 @@ renderNav();
     var f=box.querySelector("form"),inp=box.querySelector("#lkc"),msg=box.querySelector("#lkm"),busy=false;
     f.onsubmit=function(e){
       e.preventDefault();if(busy)return;var c;
-      try{c=JSON.parse(decodeURIComponent(escape(atob(inp.value.trim()))));if(!c.u||!c.k)throw 0}catch(x){msg.textContent="Код не подошёл, проверь, что вставлен целиком";return}
+      var vv=inp.value.trim();if(vv.indexOf("#c=")>=0)vv=vv.split("#c=")[1];
+      try{c=JSON.parse(decodeURIComponent(escape(atob(vv))));if(!c.u||!c.k)throw 0}catch(x){msg.textContent="Код не подошёл, проверь, что вставлен целиком";return}
       busy=true;msg.textContent="Подключаюсь, загружаю дневник…";
       var cc={url:c.u,key:c.k};
       fetchBase(cc).then(function(r){
