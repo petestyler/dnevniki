@@ -159,7 +159,7 @@ body:not(.rd) #dbar{opacity:0;pointer-events:none}
 .paper .pic.mini:hover{transform:rotate(0) scale(1.08)}
 .paper .pic.mini img{height:auto!important;max-height:84px;object-fit:cover}
 .paper .pic img{width:100%;object-fit:cover}
-.paper textarea#ed{width:100%;height:calc(100% - 90px);min-height:300px;font:400 21px/1.55 var(--read);padding:12px;border:2px solid #b9a77a;border-radius:6px;background:#fffdf6;color:var(--ink);resize:none}
+.paper textarea#ed{width:100%;height:calc(100% - 90px);min-height:300px;font:400 var(--dfs,22px)/1.58 var(--read);padding:0;border:0;border-radius:0;background:transparent;color:var(--ink);resize:none;outline:none;box-shadow:none}
 .leaf.flow .paper textarea#ed{height:55vh}
 
 /* ---------- курсор: стеклянный круг с сайта НЕСОЛЬ, системного курсора нет нигде ---------- */
@@ -382,7 +382,8 @@ body.hinting #toast{display:none!important}
 .sheet::after{content:"";position:absolute;left:58px;top:0;bottom:0;width:1px;background:rgba(190,90,70,.22)}
 .sheet h1{font:italic 500 52px/1.02 var(--disp);margin:0 0 18px;color:#16120a}
 .sheet .text{font-size:21px;line-height:1.6}
-textarea#ed{width:100%;min-height:55vh;font:400 21px/1.55 var(--read);padding:14px;border:2px solid var(--fc);border-radius:8px;background:#fffdf6;color:var(--ink);resize:vertical}
+textarea#ed{width:100%;min-height:55vh;font:400 21px/1.55 var(--read);padding:0;border:0;border-radius:0;background:transparent;color:var(--ink);resize:none;outline:none;box-shadow:none}
+textarea#ed:focus,textarea#ed:focus-visible{outline:none;box-shadow:none}
 .pics1{display:flex;flex-direction:column;gap:18px;margin-top:20px}
 .pics1 .pic{float:none;width:auto;margin:6px 4px}
 .empty{font:italic 500 30px var(--disp);color:#7d7058;padding:24px 0}
@@ -520,7 +521,7 @@ var _nd=safeLS(function(){return JSON.parse(localStorage.getItem("dn_new")||"{}"
 if(!RAW[CURY]&&Object.keys(_nd).some(function(k){return k.slice(0,4)===CURY&&_nd[k]&&_nd[k].t&&_nd[k].t.trim()}))RAW[CURY]=[];
 var YEARS=Object.keys(RAW).sort();
 var $=function(id){return document.getElementById(id)};
-var BUILD="22.11.2026 21:08";
+var BUILD="22.11.2026 21:17";
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е")}
 function safeLS(f){try{return f()}catch(e){return null}}
@@ -648,7 +649,7 @@ function favStar(){
   }else{
     var on=!(rec.d&&rec.d.on);rec.d={on:on?1:0,mt:now};msg=on?"День добавлен в избранное":"День убран из избранного";
   }
-  saveFav();toast(msg,2500);setTimeout(syQuiet,400);
+  saveFav();setTimeout(syQuiet,400);   // состояние показывает только сама звезда, без всплывающих плашек
   showDay(false);
   if(S.results&&S.results.fav)S.results=favResults();
 }
@@ -691,7 +692,7 @@ var IMENU='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
 
 /* ---------- каркас ---------- */
 $("app").innerHTML=
- '<div id="top"><button class="wbtn" id="writeBtn" title="Продолжить дневник">'+IPEN+'<span>Продолжить дневник</span></button>'+
+ '<div id="top"><button class="ib" id="writeBtn" title="Продолжить дневник" aria-label="Продолжить дневник">'+IPEN+'</button>'+
  '<div class="sbox"><input id="q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Найти слово или дату"><button id="qx" aria-label="Очистить">✕</button><button class="ib sm" id="favBtn" title="Избранное" aria-label="Избранное">'+ISTAR+'</button><button class="ib sm" id="calBtn" title="Календарь" aria-label="Календарь">'+ICAL+'</button></div>'+
  '<button class="ib" id="setBtn" title="Настройки" aria-label="Настройки">'+IGEAR+'</button>'+
  '<div class="calpop" id="calpop" hidden><div class="calh"><button class="nb" id="cpy" title="Год назад">«</button><button class="nb" id="cpm" title="Месяц назад">‹</button><div class="t" id="ct"></div><button class="nb" id="cnm" title="Месяц вперёд">›</button><button class="nb" id="cny" title="Год вперёд">»</button></div><div class="grid" id="cg"></div></div>'+
@@ -1316,14 +1317,16 @@ function makeLeaf(d,ph,box,edit,custom,cls){
   if(!box.flow)fitHoles(el,box.h);
   return el;
 }
+var LASTFS=0;   // размер шрифта последней страницы чтения: режим правки выглядит так же, как чтение
 function fitLeaf(el){
   // чем меньше текста, тем крупнее шрифт; если день всё равно длиннее листа, лист прокручивается внутри
   if(!el)return;
   if(el.classList.contains("flow")){fitHoles(el);return}
   var pc=el.querySelector(".pc"),lo=18,hi=26,best=18;
+  if(pc&&pc.querySelector("#ed")&&LASTFS){pc.style.setProperty("--dfs",LASTFS+"px");pc.style.setProperty("--hfs",Math.round(LASTFS*2.1)+"px");return}
   var ok=function(sz){pc.style.setProperty("--dfs",sz+"px");pc.style.setProperty("--hfs",Math.round(sz*2.1)+"px");return pc.scrollHeight<=pc.clientHeight+1};
   while(lo<=hi){var mid=(lo+hi)>>1;if(ok(mid)){best=mid;lo=mid+1}else hi=mid-1}
-  ok(best);
+  ok(best);if(!pc.querySelector("#ed"))LASTFS=best;
 }
 function leafHost(){return G.mob?document.querySelector("#view .lw"):($("rd")&&$("rd").querySelector(".up"))}
 function showDay(anim){
@@ -1348,7 +1351,7 @@ function showDay(anim){
     if(tok!==showDay.tok)return;
     [].forEach.call(host.querySelectorAll(".leaf"),function(e){e.remove()});
     var lf=makeLeaf(d,ph,leafBox(),S.edit);lf.classList.add("cur");host.appendChild(lf);fitLeaf(lf);
-    if(S.edit){var ta=$("ed");ta.value=d.t;ta.focus()}
+    if(S.edit){var ta=$("ed");ta.value=d.t;ta.focus();try{ta.setSelectionRange(0,0)}catch(e){}ta.scrollTop=0}   // курсор в начале: страница выглядит так же, как при чтении
     if(anim&&!REDUCE.matches&&lf.animate)lf.animate([{transform:"translateY(26px)",opacity:0},{transform:"none",opacity:1}],{duration:320,easing:"cubic-bezier(.3,.7,.2,1)"});
     if(!S.edit)prepNeighbors();
   });
