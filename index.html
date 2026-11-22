@@ -517,10 +517,10 @@ var RAW=JSON.parse(document.getElementById("data").textContent);
 var Y0=Object.keys(RAW).sort(),CURY=String(new Date().getFullYear());
 // папка текущего года появляется в стопке, только если в этом году уже есть записи; вход «Продолжить дневник» остаётся всегда
 var _nd=safeLS(function(){return JSON.parse(localStorage.getItem("dn_new")||"{}")})||{};
-if(!RAW[CURY]&&Object.keys(_nd).some(function(k){return k.slice(0,4)===CURY}))RAW[CURY]=[];
+if(!RAW[CURY]&&Object.keys(_nd).some(function(k){return k.slice(0,4)===CURY&&_nd[k]&&_nd[k].t&&_nd[k].t.trim()}))RAW[CURY]=[];
 var YEARS=Object.keys(RAW).sort();
 var $=function(id){return document.getElementById(id)};
-var BUILD="22.11.2026 20:25";
+var BUILD="22.11.2026 21:08";
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е")}
 function safeLS(f){try{return f()}catch(e){return null}}
@@ -778,7 +778,7 @@ function tabPath(W,th,tw){
 function silPath(W,H,th,tw){
   // одна цельная фигура: тело и ярлычок без шва
   var r=12,s=Math.min(24,tw*0.16),x=W-tw,rr=10;
-  return "M0,"+H+" L0,"+(th+r)+" Q0,"+th+" "+r+","+th+" L"+x+","+th+" C"+(x+s*0.55)+","+th+" "+(x+s*0.45)+",0 "+(x+s)+",0 L"+(W-rr)+",0 Q"+W+",0 "+W+","+rr+" L"+W+","+H+" Z";
+  return "M0,"+(H-r)+" L0,"+(th+r)+" Q0,"+th+" "+r+","+th+" L"+x+","+th+" C"+(x+s*0.55)+","+th+" "+(x+s*0.45)+",0 "+(x+s)+",0 L"+(W-rr)+",0 Q"+W+",0 "+W+","+rr+" L"+W+","+(H-r)+" Q"+W+","+H+" "+(W-r)+","+H+" L"+r+","+H+" Q0,"+H+" 0,"+(H-r)+" Z";
 }
 function foldSvg(y,W,H,th,tw,tabCls){
   var f=silPath(W,H,th,tw),t=tabPath(W,th,tw);
@@ -1948,7 +1948,7 @@ function putDay(key,w,text){
   BYDATE[key]=d;BYYEAR[y]=BYYEAR[y]||{};(BYYEAR[y][m]=BYYEAR[y][m]||[]).push(d);BYYEAR[y][m].sort(function(a,b){return a.dd-b.dd});
   return d;
 }
-Object.keys(NEWDAYS).forEach(function(k){if(!BYDATE[k])putDay(k,NEWDAYS[k].w,NEWDAYS[k].t)});
+Object.keys(NEWDAYS).forEach(function(k){if(!BYDATE[k]&&NEWDAYS[k].t&&NEWDAYS[k].t.trim())putDay(k,NEWDAYS[k].w,NEWDAYS[k].t)});
 
 /* вопросы: 42 вопроса, цикл 42 дня, правила ротации; день считается по Europe/Moscow */
 /*QCORE*/
@@ -2632,7 +2632,7 @@ function syApply(k,r){
   var d=BYDATE[k];
   if(d&&d.base){EDITS[k]={base:d.base,t:r.t,mt:r.mt||0};safeLS(function(){localStorage.setItem("dn_edits",JSON.stringify(EDITS))});d.t=r.t;d.n=norm(r.t);return}
   NEWDAYS[k]={w:r.w,t:r.t,mt:r.mt||0};safeLS(function(){localStorage.setItem("dn_new",JSON.stringify(NEWDAYS))});
-  if(d){d.t=r.t;d.n=norm(r.t)}else putDay(k,r.w,r.t);
+  if(d){d.t=r.t;d.n=norm(r.t)}else if(r.t&&r.t.trim())putDay(k,r.w,r.t);
 }
 function syGet(u,k){return fetch(u+(u.indexOf("?")<0?"?":"&")+"a=get&k="+encodeURIComponent(k)+"&_="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("http"+r.status);return r.text()})}
 function syPut(u,k,data,f){return fetch(u,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({a:"put",k:k,f:f||"sync",data:data})}).then(function(r){return r.json()}).then(function(j){if(!j||!j.ok)throw new Error(j&&j.error||"put");return j})}
