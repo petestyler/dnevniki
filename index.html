@@ -479,7 +479,7 @@ var Y0=Object.keys(RAW).sort(),CURY=String(new Date().getFullYear());
 if(!RAW[CURY])RAW[CURY]=[];   // папка текущего года есть всегда: в неё пишутся новые дни
 var YEARS=Object.keys(RAW).sort();
 var $=function(id){return document.getElementById(id)};
-var BUILD="22.11.2026 04:15";
+var BUILD="22.11.2026 04:57";
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е")}
 function safeLS(f){try{return f()}catch(e){return null}}
@@ -1485,8 +1485,9 @@ function parseQuery(raw){
    take(/(?<!\d)(\d{1,2})[.\-\/](\d{1,2})(?![\d.\-\/])/,function(r){if(+r[1]>31||+r[2]>12||+r[1]<1||+r[2]<1)return false;f.d=+r[1];f.m=+r[2];return true})||
    take(/(?<!\d)(199[89]|20(?:0\d|1[0-6]))(?!\d)/,function(r){f.y=+r[1];return true});
   // служебные слова и слова короче 3 букв не ищутся (числа от 2 цифр остаются)
-  var words=(s.match(/[а-яa-z0-9]+/g)||[]).filter(function(w){return /^\d+$/.test(w)?w.length>=2:(w.length>=3&&!STOP[w])});
-  return {f:f,words:words};
+  var all=s.match(/[а-яa-z0-9]+/g)||[];
+  var words=all.filter(function(w){return /^\d+$/.test(w)?w.length>=2:(w.length>=3&&!STOP[w])});
+  return {f:f,words:words,all:all};
 }
 var STOP={};("без для под над при про через перед после около между кроме среди вдоль возле вокруг против внутри вместо мимо ради сквозь насчет ввиду изо обо ото подо передо "+
   "что чтобы как так или либо если когда пока хотя даже тоже также только лишь уже еще вот вон нет это эта эти этот того тому тем том чем где куда зато однако причем притом потому поэтому будто ведь разве неужели пусть вроде именно почти всего вообще")
@@ -1516,17 +1517,21 @@ function phraseRe(stems){
   var esc=function(x){return x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")};
   return new RegExp("(?<![а-яa-z0-9])"+stems.map(function(x){return esc(x)+"[а-яa-z0-9]*"}).join("(?:[^а-яa-z0-9]+[а-яa-z0-9]{1,4}){0,2}[^а-яa-z0-9]+"));
 }
+function strictStem(w){var n=w.length;return n<=5?w:n<=8?w.slice(0,n-2):w.slice(0,n-3)}
+function strictRe(tokens){
+  // все слова запроса, включая короткие («я», «в», «на»), подряд и в том же порядке; знаки препинания между ними допускаются
+  var esc=function(x){return x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")};
+  return new RegExp("(?<![а-яa-z0-9])"+tokens.map(function(w){return /^\d+$/.test(w)||w.length<4?esc(w)+"(?![а-яa-z0-9])":esc(strictStem(w))+"[а-яa-z0-9]*"}).join("[^а-яa-z0-9]+"));
+}
 function search(raw){
   var q=parseQuery(raw),f=q.f,stems=q.words.map(stem);
-  var phrase=[],loose=[],pre=stems.length>1?phraseRe(stems):null;
+  var strict=[],relaxed=[],loose=[],sre=q.all.length>1&&stems.length?strictRe(q.all):null,pre=stems.length>1?phraseRe(stems):null;
   for(var i=0;i<DAYS.length;i++){
     var d=DAYS[i];
     if(f.y&&d.y!==f.y)continue;if(f.m&&d.m!==f.m)continue;if(f.d&&d.dd!==f.d)continue;
-    if(pre){
-      // сочетание слов: сначала дни, где слова стоят рядом именно в таком порядке
-      var m=pre.exec(d.n);
-      if(m){phrase.push({d:d,pos:m.index,ex:0,i:i});continue}
-    }
+    var m;
+    if(sre&&(m=sre.exec(d.n))){strict.push({d:d,pos:m.index,ex:0,i:i});continue}
+    if(pre&&(m=pre.exec(d.n))){relaxed.push({d:d,pos:m.index,ex:0,i:i});continue}
     var first=-1,ok=true;
     for(var k=0;k<stems.length;k++){
       var p=wordStart(d.n,stems[k]);
@@ -1535,13 +1540,16 @@ function search(raw){
     }
     if(ok){
       var ex=0;for(var k2=0;k2<q.words.length;k2++){if(wordStart(d.n,q.words[k2])<0){ex=1;break}}
-      (pre?loose:phrase).push({d:d,pos:first,ex:ex,i:i});
+      loose.push({d:d,pos:first,ex:ex,i:i});
     }
   }
-  var res=phrase,isLoose=false;
-  if(pre&&!phrase.length){res=loose;isLoose=true}   // такого сочетания нет: показываем дни, где слова встречаются по отдельности
-  if(stems.length)res.sort(function(a,b){return a.ex-b.ex||a.i-b.i});
-  return {res:res,f:f,stems:stems,loose:isLoose};
+  // сначала дни, где все слова запроса стоят подряд; если таких нет, где ключевые слова рядом (короткие пропущены); потом где слова по отдельности
+  var res=strict,alt=[],noPhrase=false;
+  if(!res.length&&relaxed.length)res=relaxed;
+  else if(!res.length&&(sre||pre)){alt=loose;res=[];noPhrase=true}   // сочетания нет: раздельные слова показываются только по просьбе
+  else if(!res.length)res=loose;
+  if(stems.length){res.sort(function(a,b){return a.ex-b.ex||a.i-b.i});alt.sort(function(a,b){return a.ex-b.ex||a.i-b.i})}
+  return {res:res,f:f,stems:stems,loose:false,alt:alt,noPhrase:noPhrase};
 }
 function snippet(r,stems){
   var t=r.d.t,pos=r.pos<0?0:r.pos;
@@ -1559,7 +1567,10 @@ function showResults(){
   // точная дата без слов: открыть сразу
   var h='<div class="sheet" style="padding-left:92px"><div class="body">';
   if(R.loose&&R.res.length)h+='<div class="empty" style="font-size:21px;padding:0 0 12px">Такого сочетания слов нет. Показаны дни, где эти слова встречаются по отдельности.</div>';
-  if(!R.res.length){
+  if(!R.res.length&&R.noPhrase){
+    h+='<div class="empty">Такого сочетания слов нет.</div>';
+    if(R.alt.length)h+='<button class="pill sm" id="altb" style="margin-top:6px">Показать дни, где эти слова встречаются по отдельности ('+R.alt.length+')</button>';
+  }else if(!R.res.length){
     if(f.y&&f.m&&f.d&&!R.stems.length)h+='<div class="empty">В этот день записи нет.</div>';
     else h+='<div class="empty">'+(R.none?"Короткие и служебные слова не ищутся.":"Ничего не нашлось.")+'</div>';
   }else{
@@ -1571,6 +1582,7 @@ function showResults(){
   h+='</div></div>';
   $("view").innerHTML=wrapFolder(h,S.y);
   [].forEach.call(document.querySelectorAll("#view .sw"),function(e){fitHoles(e)});
+  var ab=$("altb");if(ab)ab.onclick=function(){R.res=R.alt;R.noPhrase=false;R.loose=true;shown=LIM;showResults()};
   var mb=$("more");
   if(RMO){RMO.disconnect();RMO=null}
   if(mb&&window.IntersectionObserver){RMO=new IntersectionObserver(function(en){if(en[0].isIntersecting){RMO.disconnect();RMO=null;shown+=LIM;var y=$("main").scrollTop;showResults();$("main").scrollTop=y}},{root:$("main"),rootMargin:"900px"});RMO.observe(mb)}
