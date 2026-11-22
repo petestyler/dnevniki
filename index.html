@@ -294,6 +294,7 @@ body:not(.rd) #dbar{opacity:0;pointer-events:none}
 .pc.fe-t.fe-b{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 26px,#000 calc(100% - 26px),transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 26px,#000 calc(100% - 26px),transparent 100%)}
 @media(prefers-reduced-motion:reduce){.wbtn,.ib,.pill,.cam,.nb,.mx,.mt,.dy,.hok,.hno,.vopt,.grid button,#lock button,.pdel{transition:background .2s,color .2s}.mcard,.calpop{animation:none!important}}
 
+.wz{max-width:560px}.wiz{padding-left:20px;margin:12px 0}.wiz li{margin:14px 0;line-height:1.45}.wiz b{display:block;margin-bottom:2px}.wzs{display:block;opacity:.8;margin-bottom:8px}.wiz .pill,.wiz .fld{margin-top:4px}.wiz a.pill{display:inline-flex;align-items:center;height:38px;text-decoration:none}.wz h2{padding-right:40px}
 /* ---------- вход по паролю ---------- */
 #lock{position:fixed;inset:0;z-index:500;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
 #lock .lk{width:min(380px,100%);background:#121212;border:1px solid #2a2a2a;border-radius:22px;padding:30px 28px 24px;color:#efe8d6;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.7)}
@@ -508,10 +509,35 @@ var _nd=safeLS(function(){return JSON.parse(localStorage.getItem("dn_new")||"{}"
 if(!RAW[CURY]&&Object.keys(_nd).some(function(k){return k.slice(0,4)===CURY}))RAW[CURY]=[];
 var YEARS=Object.keys(RAW).sort();
 var $=function(id){return document.getElementById(id)};
-var BUILD="22.11.2026 16:02";
+var BUILD="22.11.2026 16:24";
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е")}
 function safeLS(f){try{return f()}catch(e){return null}}
+/* ---------- версия схемы данных читателя и миграция ----------
+   Всё, что вводит читатель (правки, новые дни, удалённые фото, настройки), хранится в localStorage (ключи dn_*) и IndexedDB «dnevniki».
+   У каждой версии программы есть номер схемы SCHEMA; при запуске данные старой схемы переводятся в новую, перед этим делается страховочная копия.
+   Данные новой схемы старая программа не трогает. Фиксированные имена ключей менять нельзя: только добавлять шаги ниже. */
+var SCHEMA=2;
+function migrate(){
+  var cur=+(safeLS(function(){return localStorage.getItem("dn_schema")})||0);
+  if(cur>=SCHEMA)return cur;
+  safeLS(function(){
+    var o={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k.indexOf("dn_")===0&&k.indexOf("dn_backup_")!==0)o[k]=localStorage.getItem(k)}
+    Object.keys(localStorage).forEach(function(k){if(k.indexOf("dn_backup_")===0)localStorage.removeItem(k)});
+    localStorage.setItem("dn_backup_v"+cur,JSON.stringify(o));
+  });
+  var fix=function(key,fn){safeLS(function(){var raw=localStorage.getItem(key);if(raw===null)return;var v=JSON.parse(raw);localStorage.setItem(key,JSON.stringify(fn(v)))})};
+  if(cur<1){/* схема 1: исходный формат, шагов нет */}
+  if(cur<2){
+    // схема 2: у каждой правки и нового дня есть метка времени mt (нужна синхронизации), список удалённых фото всегда массив
+    fix("dn_edits",function(v){Object.keys(v).forEach(function(k){if(!v[k].mt)v[k].mt=1});return v});
+    fix("dn_new",function(v){Object.keys(v).forEach(function(k){if(!v[k].mt)v[k].mt=1});return v});
+    fix("dn_photo_del",function(v){return Array.isArray(v)?v:[]});
+  }
+  safeLS(function(){localStorage.setItem("dn_schema",String(SCHEMA))});
+  return SCHEMA;
+}
+var SCHEMA_WAS=migrate();
 
 /* ---------- данные ---------- */
 var DAYS=[],BYDATE={},BYYEAR={};
@@ -524,11 +550,13 @@ YEARS.forEach(function(y){
   });
 });
 // сохранённые правки этого устройства (применяются, только если вшитый текст не менялся)
-var EDITS=safeLS(function(){return JSON.parse(localStorage.getItem("dn_edits")||"{}")})||{};
+var EDITS=safeLS(function(){return JSON.parse(localStorage.getItem("dn_edits")||"{}")})||{},EDITS_DIRTY=0;
 Object.keys(EDITS).forEach(function(k){
   var d=BYDATE[k],e=EDITS[k];
-  if(d&&e&&e.base===d.t){d.t=e.t}
+  // правка читателя главнее вшитого текста: если в новой версии исходный текст дня изменился, правка остаётся (прежний исходник хранится в e.ob)
+  if(d&&e){if(e.base!==d.t){e.ob=e.base;e.base=d.t;EDITS_DIRTY=1}d.t=e.t}
 });
+if(EDITS_DIRTY)safeLS(function(){localStorage.setItem("dn_edits",JSON.stringify(EDITS))});
 DAYS.forEach(function(d){d.n=norm(d.t)});
 function saveEdit(d,text){
   EDITS[d.d]={base:d.base,t:text,mt:Date.now()};
@@ -1327,6 +1355,9 @@ function closeZoom(){var z=$("zoom");z.classList.remove("on");z.innerHTML=""}
 $("zoom").onclick=closeZoom;
 
 /* ---------- добавление фото ---------- */
+function idbKeys(){return idb().then(function(db){return new Promise(function(res,rej){var q=db.transaction("kv").objectStore("kv").getAllKeys();q.onsuccess=function(){res(q.result)};q.onerror=function(){rej(q.error)}})})}
+function blobToUrl(b){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(r.result)};r.onerror=function(){rej(r.error)};r.readAsDataURL(b)})}
+function urlToBlob(u){var i=u.indexOf(","),m=/data:([^;]+)/.exec(u.slice(0,i)),bin=atob(u.slice(i+1)),a=new Uint8Array(bin.length);for(var k=0;k<bin.length;k++)a[k]=bin.charCodeAt(k);return new Blob([a],{type:m?m[1]:"image/jpeg"})}
 function userPhotos(date){return idbGet("photos:"+date).then(function(a){return a||[]},function(){return []})}
 function shrink(file){
   return new Promise(function(res){
@@ -1378,7 +1409,13 @@ function addPhotoFor(key,year,onAdded,kind){
         onAdded(URL.createObjectURL(blob),name);
         return writePhotoToFolder(year,name,blob);
       }).then(function(ok){
-        toast(ok?what+" вклеен"+(kind==="chek"?"":"о")+" и сохранен"+(kind==="chek"?"":"о")+" в папку «Фото». "+NOTE:what+" вклеен"+(kind==="chek"?"":"о")+" и сохранен"+(kind==="chek"?"":"о")+" в этом браузере. "+NOTE,10000);
+        var sfx=(kind==="chek"?"":"о");
+        if(window.__SHELL||(SY&&SY.url)){
+          if(SY&&SY.url){toast(what+" вклеен"+sfx+" и отправляется на твой Google Диск",6000);setTimeout(syQuiet,300)}
+          else toast(what+" вклеен"+sfx+", но пока только в этом телефоне. Подключи Google Диск в настройках, тогда фото сохранится и не пропадёт",12000);
+          return;
+        }
+        toast(ok?what+" вклеен"+sfx+" и сохранен"+sfx+" в папку «Фото». "+NOTE:what+" вклеен"+sfx+" и сохранен"+sfx+" в этом браузере. "+NOTE,10000);
       });
     }).catch(function(){toast("Не удалось добавить фото")});
   };
@@ -1476,7 +1513,7 @@ function doSave(){
     saveEdit(d,text);setTimeout(syQuiet,400);downloadYear(String(d.y));S.edit=false;renderDay(true);
     toast("Исправленный файл "+d.y+".txt скачан. Положи его в папку «Тексты», заменив старый. "+NOTE,12000);
   }
-  if(window.__SHELL){saveEdit(d,text);S.edit=false;renderDay(true);toast("Сохранено и отправляется на Google Диск",6000);setTimeout(syQuiet,400);return}
+  if(window.__SHELL){saveEdit(d,text);S.edit=false;renderDay(true);toast(syConnNote(),6000);setTimeout(syQuiet,400);return}
   if(!("showDirectoryPicker" in window))return viaDownload();
   saveToFile(d,text).then(function(){done(NOTE)},function(err){
     if(err&&err.name==="AbortError"){toast("Сохранение отменено");return}
@@ -2197,7 +2234,7 @@ function saveEntry(){
     else saveEdit(BYDATE[t.key],full);
     idbSet("draft",null).catch(function(){});W.lastSaved="";
   };
-  if(window.__SHELL){mem();W.open=false;openDay(t.key);toast("Запись сохранена и отправляется на Google Диск",6000);setTimeout(syQuiet,400);return}
+  if(window.__SHELL){mem();W.open=false;openDay(t.key);toast(syConnNote(),6000);setTimeout(syQuiet,400);return}
   var done=function(msg){mem();qSyncFile().catch(function(){});setTimeout(syQuiet,400);W.open=false;openDay(t.key);toast(msg,10000)};
   if(!("showDirectoryPicker" in window)){mem();setTimeout(syQuiet,400);downloadYear(String(t.y));W.open=false;openDay(t.key);toast("Файл "+t.y+".txt скачан. Положи его в папку «Тексты». "+NOTE,12000);return}
   getRoot().then(function(root){
@@ -2215,6 +2252,95 @@ function saveEntry(){
 
 /* настройки: выбор модели голоса и скачивание */
 function modelMark(key){return (window.__MODEL_OK||[]).indexOf(key)>=0}
+/* ---------- мастер «Подключить мой Google Диск» ---------- */
+var GSCODE="// \u0421\u0438\u043d\u0445\u0440\u043e\u043d\u0438\u0437\u0430\u0446\u0438\u044f \u0447\u0438\u0442\u0430\u043b\u043a\u0438 \u00ab\u0414\u043d\u0435\u0432\u043d\u0438\u043a\u0438\u00bb \u0441 Google \u0414\u0438\u0441\u043a\u043e\u043c \u0438 \u0432\u044b\u0434\u0430\u0447\u0430 \u0434\u0430\u043d\u043d\u044b\u0445 \u0434\u043b\u044f \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430.\n// \u0424\u0430\u0439\u043b\u044b \u043b\u0435\u0436\u0430\u0442 \u0432 \u043a\u043e\u0440\u043d\u0435 Google \u0414\u0438\u0441\u043a\u0430 \u0442\u043e\u0433\u043e \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0430, \u043f\u043e\u0434 \u043a\u043e\u0442\u043e\u0440\u044b\u043c \u0441\u043a\u0440\u0438\u043f\u0442 \u0440\u0430\u0437\u0432\u0451\u0440\u043d\u0443\u0442. \u0414\u043e\u0441\u0442\u0443\u043f \u0442\u043e\u043b\u044c\u043a\u043e \u043f\u043e \u0441\u0435\u043a\u0440\u0435\u0442\u043d\u043e\u043c\u0443 \u043a\u043b\u044e\u0447\u0443.\nvar NAMES = { sync: \"dnevniki-sync.json\", base: \"dnevniki-base.json\" };\nvar PHOTO_FOLDER = \"\u0424\u043e\u0442\u043e\";   // \u043f\u0430\u043f\u043a\u0430 \u0441 \u0444\u043e\u0442\u043e\u0433\u0440\u0430\u0444\u0438\u044f\u043c\u0438 \u043d\u0430 Google \u0414\u0438\u0441\u043a\u0435: \u0424\u043e\u0442\u043e/2004/\u0438\u043c\u044f.jpg\nvar KEY_CONST = \"\";          // \u043a\u043b\u044e\u0447 \u0432\u043f\u0438\u0441\u044b\u0432\u0430\u0435\u0442\u0441\u044f \u043c\u0430\u0441\u0442\u0435\u0440\u043e\u043c \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u044f \u0432 \u0447\u0438\u0442\u0430\u043b\u043a\u0435; \u0435\u0441\u043b\u0438 \u043f\u0443\u0441\u0442\u043e, \u0431\u0435\u0440\u0451\u0442\u0441\u044f \u043a\u043b\u044e\u0447 \u0438\u0437 setup()\nvar VERSION = 2;\n\nfunction key_() { return KEY_CONST || PropertiesService.getScriptProperties().getProperty(\"KEY\"); }\n\n// \u0417\u0430\u043f\u0443\u0441\u0442\u0438\u0442\u0435 \u043e\u0434\u0438\u043d \u0440\u0430\u0437 \u0432\u0440\u0443\u0447\u043d\u0443\u044e: \u0441\u043e\u0437\u0434\u0430\u0451\u0442 \u043a\u043b\u044e\u0447. \u0415\u0433\u043e \u043f\u043e\u043a\u0430\u0436\u0435\u0442 \u0436\u0443\u0440\u043d\u0430\u043b \u0432\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u044f.\nfunction setup() {\n  if (!key_()) PropertiesService.getScriptProperties().setProperty(\"KEY\", Utilities.getUuid().replace(/-/g, \"\"));\n  Logger.log(\"\u041a\u041b\u042e\u0427: \" + key_());\n}\n\nfunction name_(f) {\n  if (!f || f === \"sync\") return NAMES.sync;\n  if (f === \"base\") return NAMES.base;\n  var m = /^thumbs-(\\d{4})$/.exec(f);\n  if (m) return \"dnevniki-thumbs-\" + m[1] + \".json\";\n  if (f === \"photos\") return \"dnevniki-photos.json\";   // \u0441\u043f\u0438\u0441\u043e\u043a \u0444\u043e\u0442\u043e, \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u043d\u044b\u0445 \u0447\u0438\u0442\u0430\u0442\u0435\u043b\u0435\u043c: {ph:{\u0438\u043c\u044f:{p:\"2004/\u0438\u043c\u044f.jpg\",mt:...}}}\n  return null;\n}\n\nfunction file_(n) { var it = DriveApp.getFilesByName(n); return it.hasNext() ? it.next() : null; }\n\nfunction out_(o) {\n  return ContentService.createTextOutput(typeof o === \"string\" ? o : JSON.stringify(o)).setMimeType(ContentService.MimeType.TEXT);\n}\n\nfunction photo_(p) {\n  // p = \"2004/\u0438\u043c\u044f.jpg\"\n  var parts = String(p).split(\"/\");\n  if (parts.length !== 2 || /\\.\\./.test(p)) return \"\";\n  var roots = DriveApp.getFoldersByName(PHOTO_FOLDER);\n  while (roots.hasNext()) {\n    var r = roots.next(), ys = r.getFoldersByName(parts[0]);\n    if (!ys.hasNext()) continue;\n    var fs = ys.next().getFilesByName(parts[1]);\n    if (fs.hasNext()) {\n      var b = fs.next().getBlob();\n      return \"data:\" + b.getContentType() + \";base64,\" + Utilities.base64Encode(b.getBytes());\n    }\n  }\n  return \"\";\n}\n\nfunction doGet(e) {\n  if (!e.parameter.k || e.parameter.k !== key_()) return out_(\"\");\n  var a = e.parameter.a || \"get\";\n  if (a === \"ping\") return out_(\"dnevniki-ok-\" + VERSION);\n  if (a === \"photo\") return out_(photo_(e.parameter.p));\n  var n = name_(e.parameter.f), f = n && file_(n);\n  if (a === \"ver\") return out_(f ? String(f.getLastUpdated().getTime()) : \"\");\n  return out_(f ? f.getBlob().getDataAsString() : \"\");\n}\n\nfunction doPost(e) {\n  var b;\n  try { b = JSON.parse(e.postData.contents); } catch (x) { return out_({ ok: false, error: \"json\" }); }\n  if (!b.k || b.k !== key_()) return out_({ ok: false, error: \"\u041d\u0435\u0432\u0435\u0440\u043d\u044b\u0439 \u043a\u043b\u044e\u0447\" });\n  if (b.a === \"putphoto\") return putPhoto_(b);\n  var n = name_(b.f);\n  if (!n) return out_({ ok: false, error: \"\u0438\u043c\u044f \u0444\u0430\u0439\u043b\u0430\" });\n  var lock = LockService.getScriptLock();\n  lock.waitLock(20000);\n  try {\n    var f = file_(n);\n    if (f) f.setContent(b.data); else DriveApp.createFile(n, b.data, \"text/plain\");\n  } finally { lock.releaseLock(); }\n  return out_({ ok: true });\n}\n\n// \u0424\u043e\u0442\u043e, \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u043d\u043e\u0435 \u0432 \u0447\u0438\u0442\u0430\u043b\u043a\u0435: \u0441\u043e\u0445\u0440\u0430\u043d\u044f\u0435\u0442\u0441\u044f \u0432 \u0424\u043e\u0442\u043e/\u0413\u041e\u0414/\u0438\u043c\u044f.jpg \u0438 \u043f\u043e\u043f\u0430\u0434\u0430\u0435\u0442 \u0432 \u0441\u043f\u0438\u0441\u043e\u043a dnevniki-photos.json\nfunction putPhoto_(b) {\n  var m = /^(\\d{4})\\/([0-9A-Za-z_\\-]+\\.jpg)$/.exec(String(b.p || \"\"));\n  if (!m || String(b.data || \"\").indexOf(\"data:\") !== 0) return out_({ ok: false, error: \"\u0444\u043e\u0442\u043e\" });\n  var lock = LockService.getScriptLock();\n  lock.waitLock(30000);\n  try {\n    var roots = DriveApp.getFoldersByName(PHOTO_FOLDER);\n    var root = roots.hasNext() ? roots.next() : DriveApp.createFolder(PHOTO_FOLDER);\n    var ys = root.getFoldersByName(m[1]);\n    var yd = ys.hasNext() ? ys.next() : root.createFolder(m[1]);\n    var old = yd.getFilesByName(m[2]);\n    if (!old.hasNext()) {\n      var bytes = Utilities.base64Decode(String(b.data).split(\",\")[1]);\n      yd.createFile(Utilities.newBlob(bytes, \"image/jpeg\", m[2]));\n    }\n    var f = file_(NAMES_PHOTOS), idx = { ph: {} };\n    if (f) { try { idx = JSON.parse(f.getBlob().getDataAsString()); } catch (x) {} }\n    idx.ph = idx.ph || {};\n    idx.ph[m[2]] = { p: b.p, mt: Date.now() };\n    var js = JSON.stringify(idx);\n    if (f) f.setContent(js); else DriveApp.createFile(NAMES_PHOTOS, js, \"text/plain\");\n  } finally { lock.releaseLock(); }\n  return out_({ ok: true });\n}\nvar NAMES_PHOTOS = \"dnevniki-photos.json\";\n";
+var SITE_URL="https://petestyler.github.io/dnevniki/";
+function wizKey(){var k=safeLS(function(){return localStorage.getItem("dn_wiz_key")});if(!k){var a=new Uint8Array(16);crypto.getRandomValues(a);k=[].map.call(a,function(x){return ("0"+x.toString(16)).slice(-2)}).join("");safeLS(function(){localStorage.setItem("dn_wiz_key",k)})}return k}
+function copyText(t,okMsg){
+  var fb=function(){window.prompt("Скопируй всё целиком (Ctrl+C или Cmd+C):",t)};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast(okMsg,4000)},fb);else fb();
+}
+function shellBaseText(){
+  return new Promise(function(res){var r=indexedDB.open("dnevniki-shell",1);r.onupgradeneeded=function(){r.result.createObjectStore("kv")};
+    r.onsuccess=function(){var q=r.result.transaction("kv").objectStore("kv").get("base");q.onsuccess=function(){res(q.result||null)};q.onerror=function(){res(null)}};r.onerror=function(){res(null)}});
+}
+function pushAll(){
+  // на новый Диск уходит дневник (на телефоне: тот, что уже загружен в телефон) и миниатюры фото
+  if(!window.__SHELL)return pushBase();
+  return shellBaseText().then(function(txt){
+    if(!txt)throw new Error("в телефоне нет загруженного дневника");
+    return syPut(SY.url,SY.key,txt,"base").then(function(){
+      var chain=Promise.resolve();
+      YEARS.forEach(function(y){chain=chain.then(function(){return idbGet("thumbs-"+y)}).then(function(o){if(o&&Object.keys(o).length)return syPut(SY.url,SY.key,JSON.stringify(o),"thumbs-"+y)}).catch(function(){})});
+      return chain;
+    });
+  });
+}
+function openWizard(){
+  var m=$("modal");m.hidden=false;var key=wizKey();
+  var code=GSCODE.replace('var KEY_CONST = "";','var KEY_CONST = "'+key+'";');
+  var step=function(n,t){return '<li><b>'+t[0]+'</b><span class="wzs">'+t[1]+'</span>'+(t[2]||"")+'</li>'};
+  m.innerHTML='<div class="mcard dk wz"><button class="mx" id="mx" aria-label="Закрыть">✕</button><h2>Подключить мой Google Диск</h2>'+
+    '<p class="mt2">Это нужно сделать один раз, минут на пять. Лучше на компьютере. После этого записи и фото сами сохраняются на твой Диск и не пропадают, даже если сменится телефон. Никому ничего отправлять не нужно: скрипт будет работать только в твоём аккаунте.</p>'+
+    '<ol class="wiz">'+
+    step(1,["Открой страницу Google «Скрипты»","Нажми кнопку. Если попросит, войди в свой Google-аккаунт. Потом нажми «Новый проект».",'<a class="pill sm" id="wz1" target="_blank" rel="noopener" href="https://script.google.com/home/start">Открыть Google Скрипты</a>'])+
+    step(2,["Вставь код","Нажми кнопку ниже, потом в открывшемся окне выдели весь старый текст, вставь скопированный и нажми значок дискеты «Сохранить».",'<button class="pill sm" id="wz2">Скопировать код</button>'])+
+    step(3,["Разверни скрипт","Справа вверху нажми «Начать развёртывание», затем «Новое развёртывание». Нажми шестерёнку рядом с «Выберите тип» и выбери «Веб-приложение». В строке «У кого есть доступ» выбери «Все». Нажми «Развернуть»."])+
+    step(4,["Разреши доступ","Google попросит разрешение: нажми «Предоставить доступ» и выбери свой аккаунт. Если напишет «Google не проверил это приложение», нажми «Дополнительные», потом «Перейти на страницу (небезопасно)» и «Разрешить». Это твой собственный скрипт, он видит только твой Диск."])+
+    step(5,["Вставь сюда адрес","Скопируй «URL веб-приложения» (он начинается с https://script.google.com/macros/s/) и вставь в строку ниже.",'<input class="fld" id="wzu" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="pill sm" id="wzgo">Подключить</button>'])+
+    '</ol><div class="pst" id="wzst"></div><div id="wzdone" hidden><p class="mt2">Диск подключён. Чтобы подключить телефон, нажми кнопку и отправь себе ссылку, а на телефоне открой её.</p><div class="acts"><button class="pill sm" id="wzlink">Скопировать ссылку для телефона</button></div></div></div>';
+  $("mx").onclick=function(){m.hidden=true};
+  $("wz2").onclick=function(){copyText(code,"Код скопирован. Теперь вставь его в окно скрипта")};
+  var st=function(t){$("wzst").textContent=t};
+  $("wzgo").onclick=function(){
+    var u=$("wzu").value.trim();
+    if(!/^https:\/\/script\.google\.com\/macros\/s\/[^\s?#]+\/exec$/.test(u)){st("Адрес должен начинаться с https://script.google.com/macros/s/ и заканчиваться на /exec. Скопируй его целиком из окна «Развёртывание»");return}
+    st("Проверяю…");$("wzgo").disabled=true;
+    fetch(u+"?a=ping&k="+key+"&_="+Date.now(),{cache:"no-store"}).then(function(r){return r.text()}).then(function(t){
+      if(t.indexOf("dnevniki-ok")!==0)throw new Error("Скрипт ответил, но ключ не совпал: вставь код из шага 2 целиком и разверни заново");
+      SY={url:u,key:key};safeLS(function(){localStorage.setItem("dn_sync",JSON.stringify(SY))});
+      st("Подключено. Переношу записи, дневник и фото на твой Диск, это может занять пару минут…");
+      return syRun().then(function(r){return pushAll().then(function(){return r})}).then(function(r){
+        st("Готово! С твоего Диска получено записей: "+r.changed+(r.ph?", фото отправлено: "+r.ph.up:"")+". Дальше всё сохраняется само.");
+        $("wzdone").hidden=false;
+        $("wzlink").onclick=function(){var c=btoa(unescape(encodeURIComponent(JSON.stringify({u:SY.url,k:SY.key}))));copyText(SITE_URL+"#c="+c,"Ссылка скопирована. Отправь её себе и открой на телефоне")};
+      });
+    }).catch(function(e){$("wzgo").disabled=false;st("Не получилось: "+(e&&e.message?e.message:"нет связи со скриптом. Проверь, что в шаге 3 выбрано «У кого есть доступ: Все»"))});
+  };
+}
+/* копия записей читателя в файл и возврат из него (на случай замены папки или чистки браузера) */
+function exportBackup(){
+  idbKeys().then(function(keys){
+    var ks=keys.filter(function(k){return typeof k==="string"&&k.indexOf("photos:")===0});
+    return Promise.all(ks.map(function(k){return idbGet(k).then(function(arr){return Promise.all((arr||[]).map(function(it){return blobToUrl(it.blob).then(function(u){return {name:it.name,data:u}})}))}).then(function(a){return {date:k.slice(7),items:a}})}));
+  }).then(function(ph){
+    var o={dnevniki_copy:1,schema:SCHEMA,made:new Date().toISOString(),edits:EDITS,newdays:NEWDAYS,photo_del:PDEL.filter(function(n){return isAdded(n)}),photos:ph};
+    var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:"application/json"}));
+    a.download="Дневники-копия-записей-"+new Date().toISOString().slice(0,10)+".json";document.body.appendChild(a);a.click();a.remove();
+    toast("Копия записей сохранена в файл",5000);
+  }).catch(function(){toast("Не удалось сохранить копию")});
+}
+function importBackup(){
+  var inp=document.createElement("input");inp.type="file";inp.accept=".json,application/json";
+  inp.onchange=function(){
+    var f=inp.files&&inp.files[0];if(!f)return;
+    f.text().then(function(t){
+      var o=JSON.parse(t);if(!o.dnevniki_copy)throw new Error("это не копия записей");
+      var n=0;
+      Object.keys(o.edits||{}).forEach(function(k){if(!EDITS[k]||(o.edits[k].mt||0)>(EDITS[k].mt||0)){EDITS[k]=o.edits[k];n++}});
+      Object.keys(o.newdays||{}).forEach(function(k){if(!NEWDAYS[k]||(o.newdays[k].mt||0)>(NEWDAYS[k].mt||0)){NEWDAYS[k]=o.newdays[k];n++}});
+      (o.photo_del||[]).forEach(function(x){if(PDEL.indexOf(x)<0)PDEL.push(x)});
+      safeLS(function(){localStorage.setItem("dn_edits",JSON.stringify(EDITS));localStorage.setItem("dn_new",JSON.stringify(NEWDAYS));localStorage.setItem("dn_photo_del",JSON.stringify(PDEL))});
+      var chain=Promise.resolve(),pn=0;
+      (o.photos||[]).forEach(function(g){chain=chain.then(function(){return userPhotos(g.date)}).then(function(arr){
+        var ch=false;g.items.forEach(function(it){if(!arr.some(function(x){return x.name===it.name})&&PDEL.indexOf(it.name)<0){arr.push({name:it.name,blob:urlToBlob(it.data)});ch=true;pn++}});
+        if(ch)return idbSet("photos:"+g.date,arr);
+      })});
+      return chain.then(function(){toast("Возвращено записей: "+n+", фото: "+pn+". Перезагружаю…",3000);setTimeout(function(){location.reload()},1500)});
+    }).catch(function(e){toast("Не удалось: "+(e&&e.message||e))});
+  };
+  inp.click();
+}
 function openSettings(){
   var m=$("modal");m.hidden=false;
   m.innerHTML='<div class="mcard dk"><button class="mx" id="mx" aria-label="Закрыть">✕</button><h2>Голос</h2>'+
@@ -2223,8 +2349,8 @@ function openSettings(){
     '<button class="vopt" data-m="small"><b>Маленькая</b><span>быстрая, подходит этому компьютеру, 0,25 ГБ</span></button></div>'+
     '<button class="pill wide" id="dlm">Скачать модель для голоса</button><div class="prog" id="prog" hidden><div id="pbar"></div></div><div class="pst" id="pst"></div>'+
     '<div class="setsec pw"><h3>Пароль</h3><p class="mt2" id="pwt"></p><div class="acts"><button class="pill sm" id="pwset"></button><button class="pill sm" id="pwoff" hidden>Убрать пароль</button></div></div>'+
-    '<div class="setsec"><h3>Версия</h3><p class="mt2">Сборка от '+BUILD+'</p></div><div class="setsec"><h3>Google Диск</h3><p class="mt2">Записи сохраняются на Диске и подтягиваются на другом устройстве при открытии. Адрес и ключ даёт скрипт из папки «Google Диск».</p>'+
-    '<input class="fld" id="syu" placeholder="Адрес синхронизации (https://script.google.com/…)"><input class="fld" id="syk" placeholder="Ключ"><div class="acts"><button class="pill sm" id="syon">Включить и синхронизировать</button><button class="pill sm" id="syoff" hidden>Выключить</button></div><div class="acts"><button class="pill sm" id="sycode" hidden>Скопировать код для телефона</button><button class="pill sm" id="sypush" hidden>Отправить дневник на Диск</button></div><div class="pst" id="syst"></div></div></div>';
+    '<div class="setsec"><h3>Версия</h3><p class="mt2">Сборка от '+BUILD+'</p></div><div class="setsec"><h3>Google Диск</h3><p class="mt2">Записи и фото сохраняются на твоём Диске и подтягиваются на других устройствах.</p><div class="acts"><button class="pill sm" id="syw">Подключить мой Google Диск по шагам</button></div><p class="mt2">Если адрес и ключ уже есть, впиши их:</p>'+
+    '<input class="fld" id="syu" placeholder="Адрес синхронизации (https://script.google.com/…)"><input class="fld" id="syk" placeholder="Ключ"><div class="acts"><button class="pill sm" id="syon">Включить и синхронизировать</button><button class="pill sm" id="syoff" hidden>Выключить</button></div><div class="acts"><button class="pill sm" id="sycode" hidden>Скопировать код для телефона</button><button class="pill sm" id="sypush" hidden>Отправить дневник на Диск</button></div><div class="pst" id="syst"></div></div><div class="setsec"><h3>Копия записей</h3><p class="mt2">Файл со всеми твоими записями и вклеенными фото. Пригодится, если сменишь компьютер или телефон.</p><div class="acts"><button class="pill sm" id="bkx">Сохранить копию</button><button class="pill sm" id="bki">Вернуть из копии</button></div></div></div>';
   var hasPw=!!DNC.pw;$("pwt").textContent=hasPw?"Пароль установлен. Данные в файле зашифрованы.":"Пароля нет. Установи, чтобы дневник никто не прочитал.";
   $("pwset").textContent=hasPw?"Сменить пароль":"Установить пароль";$("pwoff").hidden=!hasPw;
   $("pwset").onclick=function(){pwDialog("set")};$("pwoff").onclick=function(){pwDialog("off")};
@@ -2235,8 +2361,9 @@ function openSettings(){
     SY={url:u,key:k};safeLS(function(){localStorage.setItem("dn_sync",JSON.stringify(SY))});$("syst").textContent="Синхронизирую…";
     syRun().then(function(r){syShow();$("syst").textContent="Готово. С Диска получено записей: "+r.changed+(r.up?", на Диск отправлено"+"":"")},function(e){$("syst").textContent="Не получилось: "+(e&&e.message||e)});
   };
-  $("sycode").hidden=!(SY&&SY.url);$("sypush").hidden=!(SY&&SY.url)||!!window.__SHELL;
-  $("sypush").onclick=function(){$("syst").textContent="Отправляю дневник на Диск…";pushBase().then(function(){$("syst").textContent=DNC.pw?"Дневник отправлен на Диск и зашифрован твоим паролем":"Дневник отправлен на Диск"},function(e){$("syst").textContent="Не получилось: "+(e&&e.message||e)})};
+  $("syw").onclick=openWizard;$("bkx").onclick=exportBackup;$("bki").onclick=importBackup;
+  $("sycode").hidden=!(SY&&SY.url);$("sypush").hidden=!(SY&&SY.url);if(window.__SHELL)$("sypush").textContent="Перенести дневник на этот Диск";
+  $("sypush").onclick=function(){$("syst").textContent="Отправляю дневник на Диск…";pushAll().then(function(){$("syst").textContent=DNC.pw?"Дневник отправлен на Диск и зашифрован твоим паролем":"Дневник отправлен на Диск"},function(e){$("syst").textContent="Не получилось: "+(e&&e.message||e)})};
   $("sycode").onclick=function(){var c=btoa(unescape(encodeURIComponent(JSON.stringify({u:SY.url,k:SY.key}))));doCopyText(c)};
   $("syoff").onclick=function(){SY=null;safeLS(function(){localStorage.setItem("dn_sync",JSON.stringify({off:1}))});syShow();$("syst").textContent="Выключено"};
   $("mx").onclick=function(){m.hidden=true};
@@ -2338,16 +2465,60 @@ function syRun(){
     var loc=syLocal(),days=Object.assign({},remote&&remote.days||{}),changed=0,up=!remote;
     Object.keys(loc).forEach(function(k){var r=days[k];if(!r||(loc[k].mt||0)>(r.mt||0)){days[k]=loc[k];up=true}});
     Object.keys(days).forEach(function(k){var r=days[k],l=loc[k];if(!l||(r.mt||0)>(l.mt||0)){syApply(k,r);changed++}});
-    var enc=function(){var j=JSON.stringify({v:1,days:days});return DNC.pw?DNC.enc(j,DNC.pw):Promise.resolve(j)};
+    // удалённые фото: объединение списков обоих устройств
+    var rpd=remote&&remote.pdel||[],lpd=PDEL.filter(function(n){return isAdded(n)});
+    rpd.forEach(function(n){if(PDEL.indexOf(n)<0){PDEL.push(n);delete PHC[n.slice(0,10)];changed++;safeLS(function(){localStorage.setItem("dn_photo_del",JSON.stringify(PDEL))});userPhotos(n.slice(0,10)).then(function(a){return idbSet("photos:"+n.slice(0,10),a.filter(function(x){return x.name!==n}))}).catch(function(){})}});
+    lpd.forEach(function(n){if(rpd.indexOf(n)<0)up=true});
+    var allpd=PDEL.filter(function(n){return isAdded(n)});
+    var enc=function(){var j=JSON.stringify({v:SCHEMA,days:days,pdel:allpd});return DNC.pw?DNC.enc(j,DNC.pw):Promise.resolve(j)};
     var p=up?enc().then(function(d){return syPut(SY.url,SY.key,d)}):Promise.resolve();
     return p.then(function(){
       safeLS(function(){localStorage.setItem("dn_sync_t",String(Date.now()))});
       if(changed&&S.mode==="day"&&curDay&&!S.edit)renderDay();
-      return {changed:changed,up:up};
+      return syPhotos().catch(function(){return {up:0,down:0,err:1}}).then(function(ph){return {changed:changed,up:up,ph:ph}});
     });
   });
 }
-function syQuiet(){if(SY&&SY.url)syRun().then(function(r){if(r.changed)toast("С Google Диска обновлено записей: "+r.changed,6000)},function(){})}
+/* фото читателя (добавленные в читалке) уходят на Диск в папку Фото/ГОД и подтягиваются на других устройствах */
+function syUrl(a,x){return SY.url+(SY.url.indexOf("?")<0?"?":"&")+"a="+a+"&k="+encodeURIComponent(SY.key)+(x||"")+"&_="+Date.now()}
+var SYPH=false;
+function syPhotos(){
+  if(!SY||!SY.url||SYPH)return Promise.resolve({up:0,down:0});
+  SYPH=true;var up=0,down=0;
+  return fetch(syUrl("get","&f=photos"),{cache:"no-store"}).then(function(r){return r.text()}).then(function(t){var o={};try{o=JSON.parse(t)||{}}catch(e){}return o.ph||{}}).then(function(ph){
+    return idbKeys().then(function(keys){
+      var dk=keys.filter(function(k){return typeof k==="string"&&k.indexOf("photos:")===0});
+      var chain=Promise.resolve();
+      dk.forEach(function(k){chain=chain.then(function(){return idbGet(k).then(function(arr){
+        var c2=Promise.resolve();
+        (arr||[]).forEach(function(it){
+          if(!it||!it.name||ph[it.name]||PDEL.indexOf(it.name)>=0)return;
+          c2=c2.then(function(){return blobToUrl(it.blob)}).then(function(u){
+            return fetch(SY.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({a:"putphoto",k:SY.key,p:k.slice(7,11)+"/"+it.name,data:u})}).then(function(r){return r.json()}).then(function(j){if(j&&j.ok){ph[it.name]={p:k.slice(7,11)+"/"+it.name};up++}})
+          }).catch(function(){});
+        });
+        return c2;
+      })})});
+      return chain.then(function(){return keys});
+    }).then(function(keys){
+      var chain=Promise.resolve();
+      Object.keys(ph).forEach(function(name){
+        if(PDEL.indexOf(name)>=0)return;
+        var date=name.slice(0,10),key="photos:"+date;
+        chain=chain.then(function(){return userPhotos(date)}).then(function(arr){
+          if(arr.some(function(x){return x.name===name}))return;
+          return fetch(syUrl("photo","&p="+encodeURIComponent(ph[name].p||(date.slice(0,4)+"/"+name))),{cache:"no-store"}).then(function(r){return r.text()}).then(function(u){
+            if(u.indexOf("data:")!==0)return;
+            return userPhotos(date).then(function(a2){if(a2.some(function(x){return x.name===name}))return;a2.push({name:name,blob:urlToBlob(u)});return idbSet(key,a2)}).then(function(){down++;delete PHC[date]});
+          });
+        }).catch(function(){});
+      });
+      return chain;
+    });
+  }).then(function(){SYPH=false;if(down&&curDay&&S.mode==="day"&&!S.edit)renderDay();return {up:up,down:down}},function(e){SYPH=false;throw e});
+}
+function syConnNote(){return SY&&SY.url?"Сохранено и отправляется на твой Google Диск":"Сохранено только на этом устройстве. Подключи Google Диск в настройках, тогда записи и фото сохранятся и не пропадут"}
+function syQuiet(){if(SY&&SY.url)syRun().then(function(r){if(r.changed||r.ph&&r.ph.down)toast("С Google Диска обновлено: "+(r.changed||0)+" записей"+(r.ph&&r.ph.down?", фото: "+r.ph.down:""),6000)},function(){})}
 setTimeout(syQuiet,1500);
 function pushBase(){
   // дневник для телефона: исходные тексты (без правок этого устройства), шифруются паролем, если он установлен
@@ -2636,7 +2807,11 @@ renderNav();
   }
   sget("base").then(function(txt){
     if(txt){d.textContent=txt;proceed();setTimeout(checkBase,4000)}
-    else connectScreen("");
+    else{
+      connectScreen("");
+      var hm=/[#&]c=([A-Za-z0-9+\/=_-]+)/.exec(location.hash||"");
+      if(hm){var ip=document.getElementById("lkc");if(ip){ip.value=hm[1];try{history.replaceState(null,"",location.pathname)}catch(x){}ip.form.dispatchEvent(new Event("submit",{cancelable:true}))}}
+    }
   });
 })();
 </script>
