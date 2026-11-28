@@ -521,7 +521,7 @@ var _nd=safeLS(function(){return JSON.parse(localStorage.getItem("dn_new")||"{}"
 if(!RAW[CURY]&&Object.keys(_nd).some(function(k){return k.slice(0,4)===CURY&&_nd[k]&&_nd[k].t&&_nd[k].t.trim()}))RAW[CURY]=[];
 var YEARS=Object.keys(RAW).sort();
 var $=function(id){return document.getElementById(id)};
-var BUILD="22.11.2026 21:17";
+var BUILD="28.11.2026 17:42";
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е")}
 function safeLS(f){try{return f()}catch(e){return null}}
@@ -581,33 +581,43 @@ function saveEdit(d,text){
 }
 
 /* ---------- избранное: дни целиком и отдельные фразы ---------- */
-var FAV=safeLS(function(){return JSON.parse(localStorage.getItem("dn_fav")||"{}")})||{};
+var FAV=(function(){
+  var raw=safeLS(function(){return localStorage.getItem("dn_fav")});
+  if(raw===null||raw==="")return {};
+  try{
+    var v=JSON.parse(raw);
+    return (v&&typeof v==="object"&&!Array.isArray(v))?v:{};
+  }catch(e){
+    safeLS(function(){if(localStorage.getItem("dn_fav_bad")===null)localStorage.setItem("dn_fav_bad",raw)});
+    return {};
+  }
+})();
 function saveFav(){safeLS(function(){localStorage.setItem("dn_fav",JSON.stringify(FAV))})}
 function fkey(t){return norm(t.replace(/\s+/g," ").trim()).slice(0,300)}
 function favSig(f){
-  var a=[];Object.keys(f||{}).forEach(function(k){var r=f[k];if(r.d)a.push(k+"|d|"+(r.d.on?1:0)+"|"+(r.d.mt||0));Object.keys(r.p||{}).forEach(function(pk){var q=r.p[pk];a.push(k+"|p|"+pk+"|"+(q.on?1:0)+"|"+(q.mt||0))})});
+  var a=[];Object.keys(f||{}).forEach(function(k){var r=f[k];if(!r)return;if(r.d)a.push(k+"|d|"+(r.d.on?1:0)+"|"+(r.d.mt||0));Object.keys(r.p||{}).forEach(function(pk){var q=r.p[pk];if(q)a.push(k+"|p|"+pk+"|"+(q.on?1:0)+"|"+(q.mt||0))})});
   return a.sort().join("\n");
 }
 function favMerge(a,b){
   // слияние двух списков избранного: у каждой записи побеждает более поздняя метка времени
   var out=JSON.parse(JSON.stringify(a||{}));
   Object.keys(b||{}).forEach(function(k){
-    var rb=b[k],ro=out[k]||(out[k]={d:null,p:{}});
+    var rb=b[k];if(!rb)return;var ro=out[k]||(out[k]={d:null,p:{}});
     if(rb.d&&(!ro.d||(rb.d.mt||0)>(ro.d.mt||0)))ro.d={on:rb.d.on?1:0,mt:rb.d.mt||0};
-    Object.keys(rb.p||{}).forEach(function(pk){var q=rb.p[pk];ro.p=ro.p||{};if(!ro.p[pk]||(q.mt||0)>(ro.p[pk].mt||0))ro.p[pk]={t:q.t,on:q.on?1:0,mt:q.mt||0}});
+    Object.keys(rb.p||{}).forEach(function(pk){var q=rb.p[pk];if(!q)return;ro.p=ro.p||{};if(!ro.p[pk]||(q.mt||0)>(ro.p[pk].mt||0))ro.p[pk]={t:q.t,on:q.on?1:0,mt:q.mt||0}});
   });
   return out;
 }
 function favDay(k){var r=FAV[k];return !!(r&&r.d&&r.d.on)}
-function favPhrases(k){var r=FAV[k],a=[];if(r&&r.p)Object.keys(r.p).forEach(function(pk){if(r.p[pk].on)a.push(r.p[pk].t)});return a}
+function favPhrases(k){var r=FAV[k],a=[];if(r&&r.p)Object.keys(r.p).forEach(function(pk){if(r.p[pk]&&r.p[pk].on)a.push(r.p[pk].t)});return a}
 function favRanges(k,t){
-  // где в тексте дня стоят сохранённые фразы (пробелы и переводы строк в них равноценны, регистр и ё/е не важны)
+  // где в тексте дня стоят сохранённые фразы (пробелы, переводы строк и знаки препинания между словами, регистр и ё/е не важны)
   var ph=favPhrases(k);if(!ph.length)return [];
   var n=norm(t);if(n.length!==t.length)return [];
   var rg=[];
   ph.forEach(function(x){
-    var w=norm(x).split(/\s+/).filter(Boolean).map(function(z){return z.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")});if(!w.length)return;
-    var re=new RegExp(w.join("\\s+"),"g"),m;
+    var w=norm(x).match(/[а-яa-z0-9]+/g);if(!w||!w.length)return;
+    var re=new RegExp(w.join("[^а-яa-z0-9]+"),"g"),m;
     while((m=re.exec(n))){rg.push([m.index,m.index+m[0].length]);if(m[0].length===0)re.lastIndex++}
   });
   rg.sort(function(a,b){return a[0]-b[0]});
@@ -656,15 +666,18 @@ function favStar(){
 function favResults(){
   var res=[];
   Object.keys(FAV).sort().forEach(function(k){
-    var d=BYDATE[k],r=FAV[k];if(!d)return;
+    var r=FAV[k];if(!r)return;
+    var d=BYDATE[k];
+    if(!d){var p=k.split("-");d={d:k,y:+p[0]||0,m:+p[1]||0,dd:+p[2]||0,t:"",missing:true}}
     if(r.d&&r.d.on)res.push({d:d,kind:"day",k:k,pk:"",pos:0,ex:0,i:0});
-    Object.keys(r.p||{}).forEach(function(pk){var q=r.p[pk];if(q.on)res.push({d:d,kind:"ph",t:q.t,k:k,pk:pk,pos:0,ex:0,i:0})});
+    Object.keys(r.p||{}).forEach(function(pk){var q=r.p[pk];if(q&&q.on)res.push({d:d,kind:"ph",t:q.t,k:k,pk:pk,pos:0,ex:0,i:0})});
   });
   return {res:res,f:{y:0,m:0,d:0},stems:[],hls:[],hasAll:true,loose:false,alt:[],noPhrase:false,fav:true};
 }
 function favSnip(r){
-  if(r.kind==="ph")return "<mark>"+esc(r.t.slice(0,400))+(r.t.length>400?" …":"")+"</mark>";
-  var t=r.d.t.replace(/\s*\n\s*/g," ").trim();return esc(t.slice(0,220))+(t.length>220?" …":"");
+  if(r.kind==="ph"){var rt=r.t||"";return "<mark>"+esc(rt.slice(0,400))+(rt.length>400?" …":"")+"</mark>"}
+  if(r.d&&r.d.missing)return "Записи за эту дату в этой версии дневника нет";
+  var t=(r.d.t||"").replace(/\s*\n\s*/g," ").trim();return esc(t.slice(0,220))+(t.length>220?" …":"");
 }
 function favTopState(){var b=$("favBtn");if(b)b.classList.toggle("on",!!(S.mode==="res"&&S.results&&S.results.fav))}
 function toggleFavView(){
@@ -674,7 +687,7 @@ function toggleFavView(){
 }
 function favRemove(k,pk){
   var r=FAV[k];if(!r)return;var now=Date.now();
-  if(pk)r.p[pk]={t:r.p[pk].t,on:0,mt:now};else r.d={on:0,mt:now};
+  if(pk){r.p=r.p||{};r.p[pk]={t:r.p[pk]?r.p[pk].t:"",on:0,mt:now}}else r.d={on:0,mt:now};
   saveFav();setTimeout(syQuiet,400);
   S.results=favResults();
   if(!G.mob&&searchOpen())refreshSearchLeaf(true);else showResults();
@@ -1824,7 +1837,7 @@ function resultsHtml(R){
     else h+='<div class="empty">'+(R.none?"Короткие и служебные слова не ищутся.":"Ничего не нашлось.")+'</div>';
   }else{
     R.res.slice(0,shown).forEach(function(r,i){
-      h+='<button class="res" data-i="'+i+'"><div class="dt">'+r.d.dd+" "+MONTHS[r.d.m-1]+" "+r.d.y+(R.fav&&r.kind==="ph"?" · фраза":"")+'</div><div class="snip">'+(R.fav?favSnip(r):snippet(r,R.hls||R.stems))+'</div>'+(R.fav?'<span class="favx" role="button" tabindex="0" title="Убрать из избранного" aria-label="Убрать из избранного" data-k="'+r.k+'" data-pk="'+esc(r.pk)+'">✕</span>':'')+'</button>';
+      h+='<button class="res" data-i="'+i+'"><div class="dt">'+r.d.dd+" "+(MONTHS[r.d.m-1]||"")+" "+r.d.y+(R.fav&&r.kind==="ph"?" · фраза":"")+'</div><div class="snip">'+(R.fav?favSnip(r):snippet(r,R.hls||R.stems))+'</div>'+(R.fav?'<span class="favx" role="button" tabindex="0" title="Убрать из избранного" aria-label="Убрать из избранного" data-k="'+r.k+'" data-pk="'+esc(r.pk)+'">✕</span>':'')+'</button>';
     });
     if(R.res.length>shown)h+='<div class="more" id="more" style="height:40px"></div>';
   }
@@ -1908,7 +1921,9 @@ document.addEventListener("click",function(e){
   if(fx){e.stopPropagation();e.preventDefault();favRemove(fx.dataset.k,fx.dataset.pk);return}
   var b=e.target.closest&&e.target.closest(".res");
   if(b&&S.results){
-    var r=S.results.res[+b.dataset.i],stems=S.results.stems;S.words=stems;
+    var r=S.results.res[+b.dataset.i],stems=S.results.stems;
+    if(!r||(S.results.fav&&r.d&&r.d.missing))return;
+    S.words=stems;
     if(!G.mob&&searchOpen()){flyOpen(r.d.d);fromResults=true;S.words=stems;return}
     openDay(r.d.d,stems);return;
   }
@@ -1952,6 +1967,21 @@ function putDay(key,w,text){
   return d;
 }
 Object.keys(NEWDAYS).forEach(function(k){if(!BYDATE[k]&&NEWDAYS[k].t&&NEWDAYS[k].t.trim())putDay(k,NEWDAYS[k].w,NEWDAYS[k].t)});
+// столкновение дат: если владелец записал новый день, а в новой сборке эта дата уже появилась, тексты сливаются в правку
+(function(){
+  var edCh=0,ndCh=0;
+  Object.keys(NEWDAYS).forEach(function(k){
+    var d=BYDATE[k],nd=NEWDAYS[k];
+    if(!d||!d.base||!nd||!nd.t||!nd.t.trim()||nd.merged)return;
+    var nt=norm(d.t).replace(/\s+/g," ").trim(),nu=norm(nd.t).replace(/\s+/g," ").trim();
+    // правка пишется и тогда, когда вшитый текст уже содержит запись: иначе старая короткая копия с Диска перекрыла бы полный день
+    var nw=nt.indexOf(nu)>=0?d.t:d.t.replace(/\s+$/,"")+"\n"+nd.t;
+    EDITS[k]={base:d.base,t:nw,mt:Math.max(nd.mt||0,(EDITS[k]&&EDITS[k].mt)||0)+1};
+    d.t=nw;d.n=norm(nw);nd.merged=1;edCh=1;ndCh=1;
+  });
+  if(edCh)safeLS(function(){localStorage.setItem("dn_edits",JSON.stringify(EDITS))});
+  if(ndCh)safeLS(function(){localStorage.setItem("dn_new",JSON.stringify(NEWDAYS))});
+})();
 
 /* вопросы: 42 вопроса, цикл 42 дня, правила ротации; день считается по Europe/Moscow */
 /*QCORE*/
@@ -2628,7 +2658,7 @@ if(SY&&SY.off)SY=null;
 function syLocal(){
   var days={};
   Object.keys(EDITS).forEach(function(k){var e=EDITS[k];if(BYDATE[k]&&BYDATE[k].base)days[k]={t:e.t,mt:e.mt||0}});
-  Object.keys(NEWDAYS).forEach(function(k){var e=NEWDAYS[k];days[k]={t:e.t,w:e.w,mt:e.mt||0,n:1}});
+  Object.keys(NEWDAYS).forEach(function(k){var e=NEWDAYS[k];if(e&&!e.merged)days[k]={t:e.t,w:e.w,mt:e.mt||0,n:1}});
   return days;
 }
 function syApply(k,r){
@@ -2659,7 +2689,7 @@ function syRun(){
     var rfav=remote&&remote.fav||{},mfav=favMerge(FAV,rfav),sl=favSig(FAV);
     if(favSig(mfav)!==sl){FAV=mfav;saveFav();changed++}
     if(favSig(mfav)!==favSig(rfav))up=true;
-    var enc=function(){var j=JSON.stringify({v:SCHEMA,days:days,pdel:allpd,fav:FAV});return DNC.pw?DNC.enc(j,DNC.pw):Promise.resolve(j)};
+    var enc=function(){var j=JSON.stringify(Object.assign({},remote||{},{v:Math.max(SCHEMA,(remote&&remote.v)||0),days:days,pdel:allpd,fav:FAV}));return DNC.pw?DNC.enc(j,DNC.pw):Promise.resolve(j)};
     var p=up?enc().then(function(d){return syPut(SY.url,SY.key,d)}):Promise.resolve();
     return p.then(function(){
       safeLS(function(){localStorage.setItem("dn_sync_t",String(Date.now()))});
@@ -2712,7 +2742,7 @@ setTimeout(syQuiet,1500);
 function pushBase(){
   // дневник для телефона: исходные тексты (без правок этого устройства), шифруются паролем, если он установлен
   if(!SY||!SY.url)return Promise.reject(new Error("Сначала включи синхронизацию"));
-  var o={};YEARS.forEach(function(y){o[y]=(RAW[y]||[]).filter(function(d){return !NEWDAYS[d.d]}).map(function(d){return {d:d.d,w:d.w,t:d.base!==undefined?d.base:d.t,p:d.p}})});
+  var o={};YEARS.forEach(function(y){o[y]=(RAW[y]||[]).filter(function(d){return !NEWDAYS[d.d]||NEWDAYS[d.d].merged}).map(function(d){return {d:d.d,w:d.w,t:d.base!==undefined?d.base:d.t,p:d.p}})});
   var json=JSON.stringify(o).replace(/<\//g,"<\\/");
   return (DNC.pw?DNC.enc(json,DNC.pw):Promise.resolve(json)).then(function(txt){return syPut(SY.url,SY.key,txt,"base")});
 }
