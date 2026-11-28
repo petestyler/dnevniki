@@ -521,7 +521,7 @@ var _nd=safeLS(function(){return JSON.parse(localStorage.getItem("dn_new")||"{}"
 if(!RAW[CURY]&&Object.keys(_nd).some(function(k){return k.slice(0,4)===CURY&&_nd[k]&&_nd[k].t&&_nd[k].t.trim()}))RAW[CURY]=[];
 var YEARS=Object.keys(RAW).sort();
 var $=function(id){return document.getElementById(id)};
-var BUILD="28.11.2026 17:42";
+var BUILD="28.11.2026 17:57";
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 function norm(s){return s.toLowerCase().replace(/ё/g,"е")}
 function safeLS(f){try{return f()}catch(e){return null}}
@@ -1246,16 +1246,31 @@ function shellThumbs(y){
   // превью года: из памяти или с устройства сразу; если их ещё нет, день открывается без фото, превью грузятся в фоне и лист обновляется
   if(THM[y])return Promise.resolve(THM[y]);
   return idbGet("thumbs-"+y).catch(function(){return null}).then(function(m){
-    if(m)return (THM[y]=m);
-    if(!SY||!SY.url)return {};
-    if(!THF[y])THF[y]=fetch(SY.url+(SY.url.indexOf("?")<0?"?":"&")+"a=get&f=thumbs-"+y+"&k="+encodeURIComponent(SY.key)+"&_="+Date.now(),{cache:"no-store"}).then(function(r){return r.text()}).then(function(t){
-      var o={};try{o=JSON.parse(t)}catch(e){}
-      if(Object.keys(o).length){THM[y]=o;idbSet("thumbs-"+y,o).catch(function(){});
-        Object.keys(PHC).forEach(function(k){if(k.slice(0,4)===String(y))delete PHC[k]});
-        if(curDay&&curDay.y===+y&&S.mode==="day"&&!S.edit)renderDay();}
-    }).catch(function(){delete THF[y]});
+    if(m){THM[y]=m;thumbsRefresh(y);return m}
+    thumbsLoad(y);
     return {};
   });
+}
+function thumbsUrl(a,y){return SY.url+(SY.url.indexOf("?")<0?"?":"&")+"a="+a+"&f=thumbs-"+y+"&k="+encodeURIComponent(SY.key)+"&_="+Date.now()}
+function thumbsLoad(y){
+  // ver: метка файла превью на Диске; запоминается вместе с превью, чтобы заметить замену фото
+  if(!SY||!SY.url||THF[y])return;
+  var ver="";
+  THF[y]=fetch(thumbsUrl("ver",y),{cache:"no-store"}).then(function(r){return r.text()}).then(function(v){ver=v}).catch(function(){}).then(function(){return fetch(thumbsUrl("get",y),{cache:"no-store"})}).then(function(r){return r.text()}).then(function(t){
+    var o={};try{o=JSON.parse(t)}catch(e){}
+    if(Object.keys(o).length){THM[y]=o;idbSet("thumbs-"+y,o).then(function(){if(ver)return idbSet("thumbver-"+y,ver)}).catch(function(){});
+      Object.keys(PHC).forEach(function(k){if(k.slice(0,4)===String(y))delete PHC[k]});
+      if(curDay&&curDay.y===+y&&S.mode==="day"&&!S.edit)renderDay();}
+  }).catch(function(){delete THF[y]});
+}
+var THV={};
+function thumbsRefresh(y){
+  // раз за запуск: если файл превью на Диске обновился, забираем его заново (без сети остаются прежние)
+  if(THV[y]||!SY||!SY.url)return;THV[y]=1;
+  fetch(thumbsUrl("ver",y),{cache:"no-store"}).then(function(r){return r.text()}).then(function(v){
+    if(!/^\d+$/.test(v))return;
+    return idbGet("thumbver-"+y).catch(function(){return null}).then(function(old){if(old!==v)thumbsLoad(y)});
+  }).catch(function(){delete THV[y]});
 }
 function zoomRemote(path,thumb){
   // полное фото подгружается с Диска; пока идёт загрузка, видно превью
